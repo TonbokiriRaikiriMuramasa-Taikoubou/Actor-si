@@ -1,0 +1,12 @@
+[
+  {
+    "skill": "brand-voice",
+    "name": "preserve meaning",
+    "input": "Polish this announcement while preserving its facts.",
+    "simulation_output": "Revised copy\nChanges made",
+    "assert_contains": [
+      "Revised copy",
+      "Changes made"
+    ]
+  }
+]

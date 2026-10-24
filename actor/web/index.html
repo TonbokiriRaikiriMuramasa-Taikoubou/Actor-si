@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Actor — SKILL.md で Gemini と話す</title>
+<link rel="stylesheet" href="/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🎭</text></svg>">
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ サイドバー ============ -->
+  <aside class="sidebar">
+    <header class="brand">
+      <div class="logo">🎭</div>
+      <div>
+        <h1>Actor</h1>
+        <p class="muted small">SKILL.md × Gemini</p>
+      </div>
+    </header>
+
+    <button class="btn primary block" id="new-session">＋ 新しい会話</button>
+
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="skills" role="tab">スキル</button>
+      <button class="tab" data-tab="sessions" role="tab">履歴</button>
+      <button class="tab" data-tab="rooms" role="tab">ルーム</button>
+    </div>
+
+    <div class="panel" id="panel-skills">
+      <input class="input" id="skill-search" type="search" placeholder="スキルを検索（例: 議事録）">
+      <ul class="list" id="skill-list"></ul>
+      <button class="btn ghost block" id="open-create">＋ 会話からスキルを作る</button>
+    </div>
+
+    <div class="panel hidden" id="panel-sessions">
+      <ul class="list" id="session-list"></ul>
+    </div>
+
+    <div class="panel hidden" id="panel-rooms">
+      <div class="row">
+        <input class="input" id="room-name" placeholder="新しいルーム名（英数字と - _）">
+        <button class="btn" id="room-create" title="作成">＋</button>
+      </div>
+      <ul class="list" id="room-list"></ul>
+      <p class="muted small">常駐ボット（<code>actor bot --room &lt;名前&gt;</code>）を同じルームに向けると、ここで会話できます。</p>
+      <p class="muted small">🎛 ツール: ボットは <code>now</code> / <code>read_file</code> などの道具を自分で呼び出します（<code>actor tools</code> で一覧）。スキルの <code>allowed-tools</code> で絞り込めます。</p>
+      <p class="muted small">📎 画像 / PDF: クリップボタンから添えると、そのまま Gemini の入力になります。ルームではトークンが要る場合 🔑 を押してください。</p>
+    </div>
+
+    <footer class="side-foot">
+      <div class="pill" id="provider-pill">接続中…</div>
+      <div class="muted small" id="skill-dirs"></div>
+      <button class="btn ghost wide" id="key-btn" title="Google AI Studio の API キーを保存する">🔑 API キー（Gemini に接続）</button>
+      <div class="key-box hidden" id="key-box">
+        <div class="muted small" id="key-status"></div>
+        <input class="input mono" id="key-input" type="password" autocomplete="off"
+               placeholder="AIza… を貼り付け">
+        <div class="row">
+          <button class="btn primary" id="key-save">保存して接続</button>
+          <button class="btn ghost" id="key-clear">解除</button>
+        </div>
+        <div class="muted small" id="key-result"></div>
+        <p class="muted small">
+          <code>.env</code> の <code>GEMINI_API_KEY</code> が最優先。ここで保存した分は
+          <code>.actor/api_key</code>（gitignore 済み・chmod 600）に入り、再起動後も使われます。
+        </p>
+      </div>
+    </footer>
+  </aside>
+
+  <!-- ============ メイン ============ -->
+  <main class="main">
+    <header class="topbar">
+      <div class="chips" id="pinned-chips"></div>
+      <div class="spacer"></div>
+      <label class="switch" title="依頼文からスキルを自動選択する">
+        <input type="checkbox" id="auto-toggle" checked><span>自動選択</span>
+      </label>
+      <label class="switch" title="thinkingConfig を有効にして思考ログを表示">
+        <input type="checkbox" id="think-toggle"><span>思考ログ</span>
+      </label>
+      <select class="select" id="model-select" title="モデル"></select>
+      <button class="btn ghost" id="export-btn" title="Gemini にアップロードできる ZIP を書き出す">ZIP</button>
+      <button class="btn ghost" id="help-btn" title="ヘルプ">?</button>
+    </header>
+
+    <section class="messages" id="messages">
+      <div class="empty" id="empty-state">
+        <h2>SKILL.md を読み込んで、Gemini と話す</h2>
+        <p class="muted">
+          <code>skills/</code> フォルダの <code>SKILL.md</code> が、そのまま <code>system_instruction</code> になります。<br>
+          左からスキルを選ぶ（複数可）か、依頼文を書けば自動で選ばれます。<br>
+          Gemini と同じく <kbd>/</kbd> でスキルを呼び出せます。
+        </p>
+        <div class="examples" id="examples"></div>
+      </div>
+    </section>
+
+    <div class="room-banner hidden" id="room-banner">
+      <span class="badge acc" id="room-banner-name">#room</span>
+      <span class="muted small" id="room-banner-status">常駐ボットの返事を待っています…</span>
+      <span class="spacer"></span>
+      <input class="input token small hidden" id="room-token" type="password"
+             placeholder="トークン" title="ルームがトークン保護されている場合に入力（ACTOR_ROOM_TOKEN）">
+      <button class="btn ghost" id="room-token-save" title="接続を確認して保存">🔑</button>
+      <button class="btn ghost" id="room-leave">会話モードに戻る</button>
+    </div>
+    <div class="composer-wrap">
+      <div class="autocomplete hidden" id="autocomplete"></div>
+      <div class="attachments hidden" id="attach-chips"></div>
+      <div class="composer">
+        <button class="btn ghost attach" id="attach-btn" title="画像 / PDF を添える">📎</button>
+        <input type="file" id="attach-input" class="hidden-file" multiple
+               accept="image/*,application/pdf,.txt,.md,.csv,.json">
+        <textarea id="input" rows="1" placeholder="依頼を入力…   「/」でスキルを呼び出す   （Shift+Enter で改行）"></textarea>
+        <button class="btn primary send" id="send" title="送信 (Enter)">
+          <span class="send-label">送信</span>
+        </button>
+      </div>
+      <div class="composer-foot">
+        <span class="muted small" id="composer-hint"></span>
+        <span class="spacer"></span>
+        <span class="muted small" id="usage-line"></span>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============ インスペクタ ============ -->
+  <aside class="inspector" id="inspector">
+    <div class="tabs small">
+      <button class="tab active" data-itab="applied">適用</button>
+      <button class="tab" data-itab="system">system</button>
+      <button class="tab" data-itab="stats">統計</button>
+    </div>
+    <div class="inspector-body" id="inspector-body"></div>
+  </aside>
+</div>
+
+<!-- ============ モーダル: スキル作成 ============ -->
+<div class="modal hidden" id="create-modal">
+  <div class="modal-card wide">
+    <header>
+      <h3>会話からスキルを作る</h3>
+      <button class="btn ghost close" data-close>✕</button>
+    </header>
+    <div class="modal-body">
+      <p class="muted small">作りたい作業を日本語で書くと、SKILL.md のドラフトを生成します。そのまま編集して保存できます。</p>
+      <textarea class="input" id="draft-request" rows="3" placeholder="例: 会議の文字起こしから、決定事項とアクションアイテムを抽出して社内フォーマットの議事録にする"></textarea>
+      <button class="btn" id="draft-btn">ドラフトを生成</button>
+      <div class="draft hidden" id="draft-result">
+        <label class="field"><span>name（kebab-case）</span><input class="input" id="draft-name"></label>
+        <label class="field"><span>description</span><input class="input" id="draft-desc"></label>
+        <label class="field"><span>instructions（SKILL.md 本文）</span><textarea class="input mono" id="draft-body" rows="14"></textarea></label>
+      </div>
+    </div>
+    <footer>
+      <button class="btn ghost" data-close>キャンセル</button>
+      <button class="btn primary" id="save-skill" disabled>スキルとして保存</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ============ モーダル: 詳細 ============ -->
+<div class="modal hidden" id="detail-modal">
+  <div class="modal-card wide">
+    <header>
+      <h3 id="detail-title">スキル</h3>
+      <button class="btn ghost close" data-close>✕</button>
+    </header>
+    <div class="modal-body" id="detail-body"></div>
+    <footer>
+      <button class="btn ghost" id="detail-export">ZIP で書き出す</button>
+      <button class="btn danger" id="detail-delete">削除</button>
+      <button class="btn" data-close>閉じる</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ============ モーダル: ヘルプ ============ -->
+<div class="modal hidden" id="help-modal">
+  <div class="modal-card">
+    <header><h3>Actor の使い方</h3><button class="btn ghost close" data-close>✕</button></header>
+    <div class="modal-body small">
+      <h4>1. スキルを作る</h4>
+      <p><code>skills/&lt;name&gt;/SKILL.md</code> を置くだけ。frontmatter の <code>name</code> は <code>my-skill</code> のような kebab-case にします。Gemini のスキル仕様と同じ形式です。サイドバーの「会話からスキルを作る」で生成もできます。</p>
+      <h4>2. スキルを適用する</h4>
+      <ul>
+        <li>サイドバーのスキルをクリック → 固定適用（複数可・スタック）</li>
+        <li>入力欄で <kbd>/</kbd> → スキルを呼び出し</li>
+        <li>何も指定しなければ、依頼文から自動選択（閾値つき）</li>
+      </ul>
+      <h4>3. 実モデルに切り替える</h4>
+      <p>いちばん簡単なのは左下の <strong>🔑 API キー</strong>：Google AI Studio のキーを貼り付けて「保存して接続」で、その場で実モデルに切り替わります（保存先 <code>.actor/api_key</code>・gitignore 済み）。<code>.env</code> の <code>GEMINI_API_KEY=...</code> を書いた場合はそちらが最優先です。未設定の間は内蔵シミュレータが応答します（このUIの動作確認用）。</p>
+      <h4>4. 持ち出す</h4>
+      <p>「ZIP」ボタンで、Gemini アプリにアップロードできる形式（最上位に SKILL.md）で書き出します。</p>
+      <h4>5. 常駐ボットと話す</h4>
+      <p>サイドバーの「ルーム」タブでルームを開くと、<code>actor bot --room &lt;名前&gt;</code> で動いている常駐ボットとそのまま会話できます。発言はルームに追記され、ボットの返事は自動で流れてきます。</p>
+      <h4>キーボード</h4>
+      <ul>
+        <li><kbd>Enter</kbd> 送信 / <kbd>Shift+Enter</kbd> 改行</li>
+        <li><kbd>↑</kbd><kbd>↓</kbd> 候補選択（/ メニュー） / <kbd>Tab</kbd> 確定</li>
+        <li><kbd>Esc</kbd> 候補を閉じる</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+<script src="/app.js"></script>
+</body>
+</html>

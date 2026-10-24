@@ -1,0 +1,12 @@
+[
+  {
+    "skill": "code-review",
+    "name": "review severity",
+    "input": "Review this change for defects and return findings by severity.",
+    "simulation_output": "## Findings\n## Severity\n## Fixes",
+    "assert_contains": [
+      "## Findings",
+      "## Severity"
+    ]
+  }
+]
