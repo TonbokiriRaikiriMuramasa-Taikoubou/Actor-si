@@ -1,0 +1,108 @@
+name: tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    env:
+      NO_PROXY: localhost,127.0.0.1,::1
+      no_proxy: localhost,127.0.0.1,::1
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      # Actor は依存パッケージを使わないため、install 手順は不要
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
+      - name: CLI smoke (1-shot / JSON)
+        run: |
+          python -m actor doctor
+          python -m actor --json "会議の議事録を作って" | tee /tmp/out.json
+          python -c "import json;d=json.load(open('/tmp/out.json'));assert d['skills']==['minutes-writer'],d['skills']"
+      - name: Skill export
+        run: python -m actor skills export minutes-writer -o /tmp/skills.zip && unzip -l /tmp/skills.zip
+
+  sdk:
+    env:
+      NO_PROXY: localhost,127.0.0.1,::1
+      no_proxy: localhost,127.0.0.1,::1
+    # google-genai を入れた状態で、SDK 経路（GenAiProvider）のテストまで通す
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install google-genai
+        run: pip install google-genai
+      - name: Run tests (SDK backend enabled)
+        run: python -m unittest discover -s tests -v
+      - name: CLI with --provider genai (SDK 未接続時は urllib へフォールバック)
+        run: python -m actor doctor
+
+  bot:
+    env:
+      NO_PROXY: localhost,127.0.0.1,::1
+      no_proxy: localhost,127.0.0.1,::1
+    # 常駐ボットとルーム API の往復を実際に動かして確認する
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Start server
+        run: |
+          python -m actor serve --port 8080 --skills-dir skills --skills-dir examples/mika &
+          for i in $(seq 1 30); do curl -sf localhost:8080/api/health && break; sleep 1; done
+      - name: Start bot
+        run: |
+          python -m actor bot --room ci-room --skills mika --name ミカ --interval 1 --from-now \
+            --skills-dir skills --skills-dir examples/mika > /tmp/bot.log 2>&1 &
+          sleep 3
+      - name: Talk to the bot and check the reply
+        run: |
+          curl -s -X POST localhost:8080/api/rooms/ci-room/messages \
+            -H 'Content-Type: application/json' -d '{"text":"おはよー","author":"CI"}' > /dev/null
+          sleep 6
+          python -m actor rooms show ci-room --skills-dir skills --skills-dir examples/mika
+          python - <<'PY'
+          import json, urllib.request
+          data = json.load(urllib.request.urlopen("http://127.0.0.1:8080/api/rooms/ci-room"))
+          roles = [m["role"] for m in data["messages"]]
+          assert roles == ["user", "assistant"], roles
+          reply = data["messages"][1]
+          assert reply["author"] == "ミカ", reply["author"]
+          assert "mika" in reply["skills"], reply["skills"]
+          print("bot round-trip OK:", reply["text"][:60])
+          PY
+      - name: Show bot log
+        if: always()
+        run: cat /tmp/bot.log
+
+  skill-packaging:
+    runs-on: ubuntu-latest
+    env:
+      NO_PROXY: localhost,127.0.0.1,::1
+      no_proxy: localhost,127.0.0.1,::1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Lint bundled portable skills
+        run: python -m actor skills lint --target agensi
+      - name: Run deterministic skill cases
+        run: python -m actor skills test
+      - name: Export portable minutes-writer
+        run: python -m actor skills export minutes-writer --target agensi -o /tmp/minutes-writer.zip

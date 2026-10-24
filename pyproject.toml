@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "actor-skills"
+version = "0.2.0"
+description = "SKILL.md を system_instruction として読み込み、Gemini API と CLI / Web API / Web UI で対話するクライアント"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "TRMTKB" }]
+keywords = ["gemini", "skills", "SKILL.md", "ai", "agent", "google-ai-studio"]
+dependencies = []
+
+[project.optional-dependencies]
+dev = []
+
+[project.scripts]
+actor = "actor.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor"
+
+[tool.setuptools]
+packages = ["actor"]
+
+[tool.setuptools.package-data]
+actor = ["web/*"]

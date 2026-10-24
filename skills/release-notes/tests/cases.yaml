@@ -1,0 +1,12 @@
+[
+  {
+    "skill": "release-notes",
+    "name": "release notes sections",
+    "input": "Write user-facing release notes from a small change list.",
+    "simulation_output": "## Highlights\n## Fixes\n## Upgrade notes",
+    "assert_contains": [
+      "## Highlights",
+      "## Fixes"
+    ]
+  }
+]

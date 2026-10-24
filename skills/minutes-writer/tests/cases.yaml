@@ -1,0 +1,13 @@
+[
+  {
+    "skill": "minutes-writer",
+    "name": "meeting notes structure",
+    "input": "Turn these notes into minutes: decide to ship; Kai owns QA by Friday.",
+    "simulation_output": "## 要約\n## 決定事項\n## アクションアイテム\n## 未決事項",
+    "assert_contains": [
+      "## 決定事項",
+      "## アクションアイテム",
+      "## 未決事項"
+    ]
+  }
+]

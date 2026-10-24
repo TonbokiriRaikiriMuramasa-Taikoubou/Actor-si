@@ -1,0 +1,13 @@
+[
+  {
+    "skill": "skill-author",
+    "name": "complete skill file",
+    "input": "Create a reusable skill with a clear output format.",
+    "simulation_output": "---\nname: example-skill\ndescription: Example. Use when needed.\n---\n# Purpose",
+    "assert_contains": [
+      "name:",
+      "description:",
+      "# Purpose"
+    ]
+  }
+]
