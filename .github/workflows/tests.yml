@@ -10,7 +10,6 @@ jobs:
   test:
     env:
       NO_PROXY: localhost,127.0.0.1,::1
-      no_proxy: localhost,127.0.0.1,::1
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -35,7 +34,6 @@ jobs:
   sdk:
     env:
       NO_PROXY: localhost,127.0.0.1,::1
-      no_proxy: localhost,127.0.0.1,::1
     # google-genai を入れた状態で、SDK 経路（GenAiProvider）のテストまで通す
     runs-on: ubuntu-latest
     steps:
@@ -53,7 +51,6 @@ jobs:
   bot:
     env:
       NO_PROXY: localhost,127.0.0.1,::1
-      no_proxy: localhost,127.0.0.1,::1
     # 常駐ボットとルーム API の往復を実際に動かして確認する
     runs-on: ubuntu-latest
     steps:
@@ -94,7 +91,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NO_PROXY: localhost,127.0.0.1,::1
-      no_proxy: localhost,127.0.0.1,::1
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
