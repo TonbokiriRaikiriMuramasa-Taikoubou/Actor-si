@@ -1,34 +1,34 @@
-# 議事録テンプレート（社内標準）
+# Meeting minutes template (internal standard)
 
 ```markdown
-# <会議名> 議事録
+# <Meeting name> Meeting Minutes
 
-- 日時: YYYY-MM-DD HH:MM〜HH:MM
-- 参加者: 名前（役割）, ...
-- 記録: Actor
+- Date and time: YYYY-MM-DD HH:MM–HH:MM
+- Participants: Name (role), ...
+- Recorded by: Actor
 
-## 1. 結論サマリ
-（3行以内。この会議で何が決まったかだけを書く）
+## 1. Executive summary
+(Up to three lines. State only what was decided in this meeting.)
 
-## 2. 決定事項
-| # | 決定内容 | 根拠・背景 |
+## 2. Decisions
+| # | Decision | Rationale / context |
 | --- | --- | --- |
 | 1 |  |  |
 
-## 3. アクションアイテム
-| # | やること | 担当 | 期限 | 成果物 |
+## 3. Action items
+| # | Action | Owner | Due date | Deliverable |
 | --- | --- | --- | --- | --- |
 | 1 |  |  |  |  |
 
-## 4. 未解決の論点
-- 論点 / なぜ決まらなかったか / 次に決める場
+## 4. Open questions
+- Question / why it remains unresolved / when it will be decided
 
-## 5. 補足・引用（必要な場合のみ）
-> 重要な発言の原文引用
+## 5. Notes and quotations (only when needed)
+> Quote an important statement verbatim
 ```
 
-## 記入ルール
-- 決定事項は「主語 + 述語」で書く。「〜らしい」「〜かもしれない」は決定事項ではない。
-- アクションアイテムの期限は ISO 形式（2026-10-20）。「なるはや」は使わず「2026-10-20（要確認）」のように書く。
-- 表の空セルは禁止。不明なら `要確認`。
-- 全体で 1 ページ（40 行以内）に収める。長い場合は補足を分離する。
+## Completion rules
+- Write each decision as a subject plus predicate. “Apparently” and “might” do not describe a decision.
+- Use ISO dates for due dates (for example, `2026-10-20`). Do not write “ASAP”; use `2026-10-20 (Needs confirmation)` when the date is uncertain.
+- Do not leave table cells blank. Write `Needs confirmation` when information is unknown.
+- Keep the full document to one page (40 lines or fewer). Move excess detail to notes.

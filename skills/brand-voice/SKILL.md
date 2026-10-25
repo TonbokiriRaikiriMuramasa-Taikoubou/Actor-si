@@ -5,45 +5,45 @@ license: MIT
 metadata:
   version: "1.0.0"
   tags:
-    - 文体
-    - 表記ゆれ
-    - トーン
+    - writing
+    - consistency
+    - tone
 ---
 
-# 目的
-外向けの文章（告知・メール・リリースノート・LP コピー）を、
-ブランドの語調と表記ルールに揃える。**内容は変えず、語り方だけを整える。**
+# Purpose
+Polish external-facing copy (announcements, emails, release notes, and landing-page text) to match the brand voice and style rules. **Change the wording, not the meaning.**
 
-# 適用範囲
-単独の依頼として受け取り、対象文の意味と事実を保ったまま最終的な文字面を整える。
+# Scope
+Treat the request as a standalone editing task. Preserve the source text's meaning and facts while improving its final wording.
 
-# 手順
-1. 文章の目的（告知 / 依頼 / 説明 / 謝罪）を判定する。
-2. 語調を統一する: です・ます調。断定できることは言い切る。過剰な敬語（〜させていただきます）は避ける。
-3. 表記ルールを適用する（下記）。
-4. 一文を60文字以内に割る。1段落は3文まで。
-5. 誇張語（圧倒的・革命的・爆速・絶対）と感嘆符を削除する。
-6. 事実関係には一切触れない。変えた箇所だけを差分で示す。
+# Procedure
+1. Identify the text's purpose (announcement, request, explanation, or apology).
+2. Make the tone consistent: use the requested register; state confirmed facts directly; avoid excessive formality or honorifics.
+3. Apply the style rules below.
+4. Keep sentences concise (aim for 60 characters or fewer when editing Japanese). Limit paragraphs to three sentences.
+5. Remove hype (such as “revolutionary,” “blazing-fast,” or “guaranteed”) and unnecessary exclamation marks.
+6. Do not alter facts. Show only the edited text and the changes made.
 
-# 表記ルール
-- 全角英数字は半角に。数字と単位の間は半角スペース（`10 GB`、`3 分`）。
-- 記号は `、` と `。`。括弧は `（）` 全角、英数字を囲む場合は半角 `()`。
-- 製品名は初出時に正式表記、以降は短縮形可。
-- 「〜して下さい」は「〜してください」。「出来る」は「できる」。
-- 見出しに句点を付けない。体言止めを基本とする。
+# Style rules
+- Use half-width Latin letters and digits. Put a space between numbers and units (for example, `10 GB` and `3 min`).
+- Use punctuation and parentheses appropriate to the text's language. For Japanese, follow standard Japanese punctuation and bracket conventions, and use half-width parentheses around Latin text.
+- Use the product's official name on first mention; a shortened form is acceptable afterward.
+- For Japanese, prefer the standard kana spellings for common words over outdated kanji spellings.
+- Do not end headings with periods; prefer concise noun phrases.
 
-# 出力フォーマット
+# Output format
 ```markdown
-## 整えた文章
-<最終稿>
+## Polished copy
+<Final copy in the user's language>
 
-## 変更点（最大7件）
-| # | 変更前 | 変更後 | 理由 |
+## Changes (up to 7 items)
+| # | Before | After | Reason |
 | --- | --- | --- | --- |
 ```
 
-# 確認事項
-- 共通の判断原則は `references/principles.md` を適用する。
-- 事実・数値・固有名詞・リンクは改変せず、変更が必要に見える場合は指摘だけする。
-- 元の意図が読み取れない箇所は書き換えず「要確認」として残す。
-- 丁寧さを上げるための語尾の水増しをしない。
+# Checklist
+- Write prose in the user's language while keeping the required headings above exactly as specified.
+- Apply the shared principles in `references/principles.md`.
+- Do not alter facts, figures, proper names, or links. If a change seems necessary, flag it without making it.
+- Do not rewrite passages whose intent is unclear; mark them **Needs confirmation**.
+- Do not pad sentences merely to make them sound more polite.

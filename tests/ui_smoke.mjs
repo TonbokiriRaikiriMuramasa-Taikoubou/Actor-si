@@ -1,11 +1,13 @@
-// Actor Web UI のスモークテスト（任意・開発用）
+// Optional UI smoke test for development.
 //
-//   1) 依存を入れる:  npm install --no-save --package-lock=false jsdom
-//   2) サーバー起動:  ACTOR_ROOM_TOKEN=ui-smoke-test-token python3 -m actor serve --port 8080
-//   3) 実行:          ACTOR_ROOM_TOKEN=ui-smoke-test-token node tests/ui_smoke.mjs
-//
-// 実サーバーに対して jsdom で UI を起動し、スキル一覧・「/」呼び出し・
-// SSE ストリーミング・インスペクタ・スキル生成までを検証する。
+//   1) Install jsdom: npm install --no-save --package-lock=false jsdom
+//   2) Generate a temporary token and start the server in this shell:
+//      export ACTOR_ROOM_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+//      python3 -m actor serve --port 8080 & server_pid=$!
+//   3) Wait for /api/health, run `node tests/ui_smoke.mjs`, then stop `$server_pid`.
+
+// Run jsdom against the real server and exercise skill listing, slash completion,
+// SSE streaming, the inspector, and skill creation.
 import { JSDOM, VirtualConsole } from 'jsdom';
 
 const BASE = process.env.BASE || 'http://127.0.0.1:8080';
@@ -92,7 +94,7 @@ check('送信: ユーザー + アシスタントの2件', msgs.length === 2, `${
 const reply = msgs[1] ? msgs[1].querySelector('.content').textContent : '';
 check('応答: シミュレーション注記を含む', reply.includes('シミュレーションモード'), reply.slice(0, 40).replace(/\n/g, ' '));
 check('応答: 適用スキルが選ばれている', msgs[1]?.querySelector('.who')?.textContent.includes('minutes-writer'), msgs[1]?.querySelector('.who')?.textContent.trim());
-check('応答: 出力フォーマットのテンプレートが展開される', reply.includes('議事録') && reply.includes('アクションアイテム'));
+check('Reply: the English brand-voice template is included', reply.includes('## Polished copy') && reply.includes('## Changes (up to 7 items)'));
 // マークダウンレンダラ単体
 const md = window.renderMarkdown([
   '## 見出し',

@@ -35,6 +35,19 @@ class PortableSkillsTest(unittest.TestCase):
             with self.subTest(resource=packaged.name):
                 self.assertEqual(packaged.read_bytes(), canonical.read_bytes())
 
+    def test_japanese_skill_set_lints_and_exports_localized_principles(self):
+        repo = Path(__file__).resolve().parents[1]
+        library = SkillLibrary([repo / "i18n" / "ja" / "skills"])
+        reports = lint_skills(library.all())
+        self.assertEqual(len(reports), 5)
+        self.assertTrue(all(report.passed for report in reports))
+        archive, export_reports = export_zip([library.get("minutes-writer")])
+        self.assertTrue(export_reports[0].passed)
+        with zipfile.ZipFile(io.BytesIO(archive)) as zf:
+            localized = zf.read("minutes-writer/references/principles.md")
+        expected = (repo / "i18n" / "ja" / "skills" / "_house" / "principles.md").read_bytes()
+        self.assertEqual(localized, expected)
+
     def test_sponsor_links_are_not_in_listing_or_skill_zip(self):
         repo = Path(__file__).resolve().parents[1]
         self.assertNotIn("github.com/sponsors", (repo / "LISTING.md").read_text(encoding="utf-8").lower())

@@ -1,0 +1,15 @@
+[
+  {
+    "name": "release note template headings",
+    "input": "Release v0.2.1 dated 2026-11-01: add CSV import, change the export dialog, fix a crash. No incompatible changes. Keep every template heading and mark empty categories as none.",
+    "assert_contains": [
+      "# リリースノート",
+      "## ハイライト",
+      "## 追加",
+      "## 変更",
+      "## 修正",
+      "## 互換性のない変更",
+      "## その他"
+    ]
+  }
+]

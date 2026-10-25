@@ -20,6 +20,18 @@ Linting is a conservative local approximation, not Agensi's private scanner or a
 
 Other agents use their own skill directories and may support different metadata or tool identifiers; consult each agent's current documentation.
 
+## Language variants
+
+English is the default source edition under `skills/`. The Japanese localization is kept separately under `i18n/ja/skills/` and is only loaded when explicitly selected. English output headings are fixed by the English skill contract; the response body should follow the user's language. The Japanese edition mirrors the same procedures and checks with localized headings.
+
+Lint, format-check, or export a Japanese skill by passing the localized directory explicitly:
+
+```sh
+python -m actor skills --skills-dir i18n/ja/skills lint --target agensi
+python -m actor skills --skills-dir i18n/ja/skills test
+python -m actor skills --skills-dir i18n/ja/skills export minutes-writer --target agensi -o minutes-writer-ja.zip
+```
+
 ## Test cases
 
-`skills/<name>/tests/cases.yaml` uses JSON syntax (valid YAML 1.2) and lives outside the export package; Actor excludes test folders from reference loading as well. `python -m actor skills test` checks only that the asserted headings match the static output-format specification; it does not call a model or generate sample output. Use `--live` to send case prompts to the configured model and verify its actual response headings; live calls may incur API charges. Neither mode replaces human quality review.
+`skills/<name>/tests/cases.yaml` uses JSON syntax (valid YAML 1.2) and lives outside the export package; Actor excludes test folders from reference loading as well. `python -m actor skills test` checks only that the asserted headings match the static output-format specification; it does not call a model or generate sample output. Use `--live` to send case prompts to the configured model and verify its actual response headings; live calls may incur API charges. Neither mode replaces human quality review. The Japanese edition keeps its own cases under `i18n/ja/skills/<name>/tests/cases.yaml` and is checked with the same command plus `--skills-dir i18n/ja/skills`.

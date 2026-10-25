@@ -3,9 +3,9 @@
     "name": "review findings sections",
     "input": "Review this change. The code contains a clear null-pointer bug; report it by severity, with conclusion and findings sections.",
     "assert_contains": [
-      "## 結論",
-      "## 指摘",
-      "### [High] <1行で内容>"
+      "## Conclusion",
+      "## Findings",
+      "### [High] <One-line summary>"
     ]
   }
 ]

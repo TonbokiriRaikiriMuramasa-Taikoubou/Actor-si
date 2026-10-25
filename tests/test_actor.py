@@ -265,9 +265,9 @@ class ConfigTest(unittest.TestCase):
         self.assertTrue(settings.is_demo)
 
     def test_api_key_never_leaks(self):
-        settings = Settings(api_key="AIzaSyABCDEFGHIJKLMNOP")
+        settings = Settings(api_key="fixture-SyABCDEFGHIJKLMNOP")
         dump = json.dumps(settings.to_dict())
-        self.assertNotIn("AIzaSyABCDEFGHIJKLMNOP", dump)
+        self.assertNotIn("fixture-SyABCDEFGHIJKLMNOP", dump)
 
     def test_thinking_config(self):
         settings = Settings(thinking_budget=0)
@@ -1245,7 +1245,7 @@ class CliTest(unittest.TestCase):
                    ACTOR_DATA_DIR=str(Path(tmp.name) / ".actor"), ACTOR_MOCK_DELAY="0")
         env.pop("GEMINI_API_KEY", None)
         result = subprocess.run(
-            [sys.executable, "-m", "actor", "--json", "会議の議事録を作って"],
+            [sys.executable, "-m", "actor", "--json", "Create minutes from meeting notes"],
             capture_output=True, text=True, cwd=str(Path(__file__).resolve().parent.parent), env=env, timeout=60,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -1738,21 +1738,21 @@ class ApiKeyConfigTest(unittest.TestCase):
         self.assertFalse(settings.api_key)
         self.assertEqual(settings.api_key_source, "")
 
-        path = write_api_key(settings, "AIzaTESTKEY1234567890")
+        path = write_api_key(settings, "fixture-TESTKEY1234567890")
         self.assertEqual(path, self.data / "api_key")
-        self.assertEqual(path.read_text(encoding="utf-8").strip(), "AIzaTESTKEY1234567890")
+        self.assertEqual(path.read_text(encoding="utf-8").strip(), "fixture-TESTKEY1234567890")
         if os.name != "nt":
             self.assertEqual(oct(path.stat().st_mode & 0o777), "0o600")
 
         loaded = self.make()
-        self.assertEqual(loaded.api_key, "AIzaTESTKEY1234567890")
+        self.assertEqual(loaded.api_key, "fixture-TESTKEY1234567890")
         self.assertEqual(loaded.api_key_source, "file")
         self.assertEqual(loaded.effective_provider, "gemini")   # キーがあるので mock ではない
-        self.assertEqual(mask_key(loaded.api_key), "AIzaTE…7890")
+        self.assertEqual(mask_key(loaded.api_key), "fixtur…7890")
         # /api/config 相当の辞書には生のキーを載せない
         payload = loaded.to_dict()
         self.assertEqual(payload["api_key"], True)
-        self.assertNotIn("AIzaTESTKEY1234567890", json.dumps(payload))
+        self.assertNotIn("fixture-TESTKEY1234567890", json.dumps(payload))
 
         self.assertTrue(clear_api_key(loaded))
         self.assertFalse(self.make().api_key)
@@ -1760,19 +1760,19 @@ class ApiKeyConfigTest(unittest.TestCase):
     def test_env_wins_over_saved_file(self):
         from actor.config import write_api_key
 
-        write_api_key(self.make(), "AIzaFROMFILE1234567890")
+        write_api_key(self.make(), "fixture-FROMFILE1234567890")
         settings = load_settings(
-            env={"ACTOR_DATA_DIR": str(self.data), "GEMINI_API_KEY": "AIzaFROMENV1234567890"},
+            env={"ACTOR_DATA_DIR": str(self.data), "GEMINI_API_KEY": "fixture-FROMENV1234567890"},
             env_file=Path(self.tmp.name) / "no-such.env",
         )
-        self.assertEqual(settings.api_key, "AIzaFROMENV1234567890")
+        self.assertEqual(settings.api_key, "fixture-FROMENV1234567890")
         self.assertEqual(settings.api_key_source, "env")
 
     def test_dotenv_is_read_from_project_root(self):
         env_file = Path(self.tmp.name) / "custom.env"
-        env_file.write_text("GEMINI_API_KEY=AIzaFROMDOTENV123456789\n", encoding="utf-8")
+        env_file.write_text("GEMINI_API_KEY=fixture-FROMDOTENV123456789\n", encoding="utf-8")
         settings = load_settings(env={"ACTOR_DATA_DIR": str(self.data)}, env_file=env_file)
-        self.assertEqual(settings.api_key, "AIzaFROMDOTENV123456789")
+        self.assertEqual(settings.api_key, "fixture-FROMDOTENV123456789")
         self.assertEqual(settings.api_key_source, ".env")
 
 
@@ -1839,12 +1839,12 @@ class ApiKeyApiTest(unittest.TestCase):
         self.assertTrue(info["simulated"])
 
     def test_set_switches_to_real_provider_and_chats(self):
-        status, info = self.call("POST", "/api/key", {"api_key": "AIzaUIKEY1234567890abcd"})
+        status, info = self.call("POST", "/api/key", {"api_key": "fixture-UIKEY1234567890abcd"})
         self.assertEqual(status, 200, info)
         self.assertEqual(info["provider"], "gemini")
         self.assertFalse(info["simulated"])
         self.assertEqual((self.data / "api_key").read_text(encoding="utf-8").strip(),
-                         "AIzaUIKEY1234567890abcd")
+                         "fixture-UIKEY1234567890abcd")
 
         # 切り替え後は実 API（偽サーバー）へ投げられる
         _FakeGemini.captured = []
@@ -1857,10 +1857,10 @@ class ApiKeyApiTest(unittest.TestCase):
         # /api/config は生のキーを返さない
         status, config = self.call("GET", "/api/config")
         self.assertTrue(config["has_api_key"])
-        self.assertNotIn("AIzaUIKEY1234567890abcd", json.dumps(config))
+        self.assertNotIn("fixture-UIKEY1234567890abcd", json.dumps(config))
 
     def test_invalid_keys_are_rejected(self):
-        for bad, hint in [("", "必須"), ("AIza with space 1234567890", "空白"),
+        for bad, hint in [("", "必須"), ("fixture- with space 1234567890", "空白"),
                           ("short", "短すぎ"), ("x" * 19, "短すぎ")]:
             with self.subTest(key=bad[:12]):
                 status, body = self.call("POST", "/api/key", {"api_key": bad})
@@ -1874,7 +1874,7 @@ class ApiKeyApiTest(unittest.TestCase):
         settings.base_url = "http://127.0.0.1:9"      # 到達できない URL
         try:
             status, info = self.call("POST", "/api/key",
-                                     {"api_key": "AIzaNOPE1234567890abcd", "check": True})
+                                     {"api_key": "fixture-NOPE1234567890abcd", "check": True})
             self.assertEqual(status, 200, info)
             self.assertFalse(info["check"]["ok"])
             self.assertEqual(info["provider"], "mock")   # 切り替えずに戻す
@@ -1888,7 +1888,7 @@ class ApiKeyApiTest(unittest.TestCase):
             settings.base_url = original
 
     def test_clear_returns_to_simulator(self):
-        self.call("POST", "/api/key", {"api_key": "AIzaCLEARME1234567890"})
+        self.call("POST", "/api/key", {"api_key": "fixture-CLEARME1234567890"})
         status, info = self.call("DELETE", "/api/key")
         self.assertEqual(status, 200)
         self.assertTrue(info["simulated"])
@@ -1897,7 +1897,7 @@ class ApiKeyApiTest(unittest.TestCase):
         self.assertTrue(payload["simulated"])
 
     def test_check_reports_api_health(self):
-        status, info = self.call("POST", "/api/key", {"api_key": "AIzaCHECKME1234567890", "check": True})
+        status, info = self.call("POST", "/api/key", {"api_key": "fixture-CHECKME1234567890", "check": True})
         self.assertEqual(status, 200, info)
         self.assertIsNotNone(info["check"])
 
@@ -1922,13 +1922,13 @@ class ApiKeyCliTest(unittest.TestCase):
             self.assertEqual(shown.returncode, 0, shown.stderr)
             self.assertIn("未設定", shown.stdout)
 
-            saved = self.run_cli(["key", "set", "--stdin"], data_dir, stdin="AIzaCLIKEY1234567890\n")
+            saved = self.run_cli(["key", "set", "--stdin"], data_dir, stdin="fixture-CLIKEY1234567890\n")
             self.assertEqual(saved.returncode, 0, saved.stderr)
             self.assertIn(".actor/api_key", saved.stdout)
 
             shown = self.run_cli(["key", "show"], data_dir)
-            self.assertIn("AIzaCL…7890", shown.stdout)
-            self.assertNotIn("AIzaCLIKEY1234567890", shown.stdout)   # 生の値は出さない
+            self.assertIn("fixtur…7890", shown.stdout)
+            self.assertNotIn("fixture-CLIKEY1234567890", shown.stdout)   # 生の値は出さない
 
             cleared = self.run_cli(["key", "clear"], data_dir)
             self.assertEqual(cleared.returncode, 0, cleared.stderr)
@@ -2028,59 +2028,59 @@ class KeyPoolTest(unittest.TestCase):
 
     # ---- 集め方（後方互換と優先順位） ----
     def test_single_key_still_works(self):
-        settings = load_settings(env={"ACTOR_DATA_DIR": str(self.data), "GEMINI_API_KEY": "AIzaONE1234567890abcd"},
+        settings = load_settings(env={"ACTOR_DATA_DIR": str(self.data), "GEMINI_API_KEY": "fixture-ONE1234567890abcd"},
                                  env_file=self.root / "no-such.env")
-        self.assertEqual(settings.api_key, "AIzaONE1234567890abcd")
+        self.assertEqual(settings.api_key, "fixture-ONE1234567890abcd")
         self.assertEqual(settings.api_key_source, "env")
         self.assertEqual(settings.api_key_count, 1)
 
     def test_multiple_keys_from_env_and_dotenv(self):
         env_file = self.root / ".env"
-        env_file.write_text("GEMINI_API_KEYS=AIzaENV1_1234567890, AIzaENV2_1234567890\n", encoding="utf-8")
+        env_file.write_text("GEMINI_API_KEYS=fixture-ENV1_1234567890, fixture-ENV2_1234567890\n", encoding="utf-8")
         settings = load_settings(
-            env={"ACTOR_DATA_DIR": str(self.data), "GEMINI_API_KEYS": "AIzaPROC1_1234567890;AIzaPROC2_1234567890"},
+            env={"ACTOR_DATA_DIR": str(self.data), "GEMINI_API_KEYS": "fixture-PROC1_1234567890;fixture-PROC2_1234567890"},
             env_file=env_file,
         )
         # 環境変数が .env より優先。区切りは , / ; / 空白のどれでも
-        self.assertEqual(settings.api_keys, ["AIzaPROC1_1234567890", "AIzaPROC2_1234567890",
-                                             "AIzaENV1_1234567890", "AIzaENV2_1234567890"])
-        self.assertEqual(settings.api_key, "AIzaPROC1_1234567890")
+        self.assertEqual(settings.api_keys, ["fixture-PROC1_1234567890", "fixture-PROC2_1234567890",
+                                             "fixture-ENV1_1234567890", "fixture-ENV2_1234567890"])
+        self.assertEqual(settings.api_key, "fixture-PROC1_1234567890")
         self.assertEqual(settings.api_key_count, 4)
 
     def test_cli_key_is_first_and_deduped(self):
         settings = load_settings(
-            env={"ACTOR_DATA_DIR": str(self.data), "GEMINI_API_KEY": "AIzaENVKEY_1234567890"},
+            env={"ACTOR_DATA_DIR": str(self.data), "GEMINI_API_KEY": "fixture-ENVKEY_1234567890"},
             env_file=self.root / "no-such.env",
-            api_key="AIzaCLIKEY_1234567890",
+            api_key="fixture-CLIKEY_1234567890",
         )
-        self.assertEqual(settings.api_key, "AIzaCLIKEY_1234567890")
+        self.assertEqual(settings.api_key, "fixture-CLIKEY_1234567890")
         self.assertEqual(settings.api_key_source, "cli")
-        self.assertEqual(settings.api_keys, ["AIzaCLIKEY_1234567890", "AIzaENVKEY_1234567890"])
-        self.assertEqual(settings.key_pool().current, "AIzaCLIKEY_1234567890")
+        self.assertEqual(settings.api_keys, ["fixture-CLIKEY_1234567890", "fixture-ENVKEY_1234567890"])
+        self.assertEqual(settings.key_pool().current, "fixture-CLIKEY_1234567890")
 
     def test_saved_file_and_keys_dir(self):
         from actor.config import write_api_key, write_keys_dir
 
         settings = load_settings(env={"ACTOR_DATA_DIR": str(self.data)}, env_file=self.root / "no-such.env")
-        write_api_key(settings, "AIzaFILEKEY_1234567890")
-        paths = write_keys_dir(settings, ["AIzaDIRKEY1_1234567890", "AIzaDIRKEY2_1234567890"])
+        write_api_key(settings, "fixture-FILEKEY_1234567890")
+        paths = write_keys_dir(settings, ["fixture-DIRKEY1_1234567890", "fixture-DIRKEY2_1234567890"])
         self.assertEqual([p.name for p in paths], ["key-1.key", "key-2.key"])
-        self.assertEqual(paths[0].read_text(encoding="utf-8").strip(), "AIzaDIRKEY1_1234567890")
+        self.assertEqual(paths[0].read_text(encoding="utf-8").strip(), "fixture-DIRKEY1_1234567890")
         if os.name != "nt":
             self.assertEqual(oct(paths[0].stat().st_mode & 0o777), "0o600")
 
         reloaded = load_settings(env={"ACTOR_DATA_DIR": str(self.data)}, env_file=self.root / "no-such.env")
-        self.assertEqual(reloaded.api_keys, ["AIzaFILEKEY_1234567890", "AIzaDIRKEY1_1234567890",
-                                             "AIzaDIRKEY2_1234567890"])
+        self.assertEqual(reloaded.api_keys, ["fixture-FILEKEY_1234567890", "fixture-DIRKEY1_1234567890",
+                                             "fixture-DIRKEY2_1234567890"])
         self.assertEqual(reloaded.api_key_source, "file")
         self.assertEqual(reloaded.key_pool().size, 3)
 
     def test_duplicate_keys_are_merged(self):
         from actor.keys import collect_entries
 
-        entries = collect_entries(env={"GEMINI_API_KEYS": "AIzaSAME_1234567890,AIzaOTHER_1234567890"},
-                                  dotenv={"GEMINI_API_KEY": "AIzaSAME_1234567890"})
-        self.assertEqual([e.value for e in entries], ["AIzaSAME_1234567890", "AIzaOTHER_1234567890"])
+        entries = collect_entries(env={"GEMINI_API_KEYS": "fixture-SAME_1234567890,fixture-OTHER_1234567890"},
+                                  dotenv={"GEMINI_API_KEY": "fixture-SAME_1234567890"})
+        self.assertEqual([e.value for e in entries], ["fixture-SAME_1234567890", "fixture-OTHER_1234567890"])
         self.assertEqual(entries[0].source, "env")
 
     # ---- ローテーション ----
@@ -2088,65 +2088,65 @@ class KeyPoolTest(unittest.TestCase):
         from actor.keys import KeyEntry, KeyPool
 
         now = [1_000.0]
-        pool = KeyPool([KeyEntry("AIzaAAAA_1234567890"), KeyEntry("AIzaBBBB_1234567890")],
+        pool = KeyPool([KeyEntry("fixture-AAAA_1234567890"), KeyEntry("fixture-BBBB_1234567890")],
                        cooldown=60.0, clock=lambda: now[0])
-        self.assertEqual(pool.current, "AIzaAAAA_1234567890")
+        self.assertEqual(pool.current, "fixture-AAAA_1234567890")
         self.assertTrue(pool.rotate(status=429, reason="429 Quota exceeded", retry_after=31))
-        self.assertEqual(pool.current, "AIzaBBBB_1234567890")
+        self.assertEqual(pool.current, "fixture-BBBB_1234567890")
         self.assertEqual(pool.ready_count, 1)
-        self.assertGreater(pool.limited_for("AIzaAAAA_1234567890"), 0)
+        self.assertGreater(pool.limited_for("fixture-AAAA_1234567890"), 0)
         # retryDelay（31s）より cooldown（60s）が長いのでそちらを採る
-        self.assertGreater(pool.limited_for("AIzaAAAA_1234567890"), 55)
+        self.assertGreater(pool.limited_for("fixture-AAAA_1234567890"), 55)
         # 2 本目も制限になったら全滅
         self.assertFalse(pool.rotate(status=429, reason="429"))
         self.assertEqual(pool.next_available_in() > 0, True)
         # 時間が経てば復帰する
         now[0] += 61
-        self.assertTrue(pool.is_ready("AIzaAAAA_1234567890"))
+        self.assertTrue(pool.is_ready("fixture-AAAA_1234567890"))
         self.assertEqual(pool.ready_count, 2)
 
     def test_retry_after_longer_than_cooldown_is_honoured(self):
         from actor.keys import KeyEntry, KeyPool
 
-        pool = KeyPool([KeyEntry("AIzaAAAA_1234567890"), KeyEntry("AIzaBBBB_1234567890")], cooldown=10.0)
-        pool.rotate(key="AIzaAAAA_1234567890", status=429, retry_after=120)
-        self.assertGreater(pool.limited_for("AIzaAAAA_1234567890"), 100)
+        pool = KeyPool([KeyEntry("fixture-AAAA_1234567890"), KeyEntry("fixture-BBBB_1234567890")], cooldown=10.0)
+        pool.rotate(key="fixture-AAAA_1234567890", status=429, retry_after=120)
+        self.assertGreater(pool.limited_for("fixture-AAAA_1234567890"), 100)
 
     def test_mark_ok_clears_limit_and_counts(self):
         from actor.keys import KeyEntry, KeyPool
 
-        pool = KeyPool([KeyEntry("AIzaAAAA_1234567890")], cooldown=60.0)
-        pool.mark_limited("AIzaAAAA_1234567890", status=429, reason="429")
-        self.assertFalse(pool.is_ready("AIzaAAAA_1234567890"))
-        pool.mark_ok("AIzaAAAA_1234567890")
-        self.assertTrue(pool.is_ready("AIzaAAAA_1234567890"))
+        pool = KeyPool([KeyEntry("fixture-AAAA_1234567890")], cooldown=60.0)
+        pool.mark_limited("fixture-AAAA_1234567890", status=429, reason="429")
+        self.assertFalse(pool.is_ready("fixture-AAAA_1234567890"))
+        pool.mark_ok("fixture-AAAA_1234567890")
+        self.assertTrue(pool.is_ready("fixture-AAAA_1234567890"))
         self.assertEqual(pool.status()[0]["uses"], 1)
 
     def test_state_file_records_only_fingerprints(self):
         from actor.keys import KeyEntry, KeyPool, fingerprint
 
         state = self.data / "key_state.json"
-        pool = KeyPool([KeyEntry("AIzaSECRET_1234567890"), KeyEntry("AIzaOTHER_1234567890")],
+        pool = KeyPool([KeyEntry("fixture-SECRET_1234567890"), KeyEntry("fixture-OTHER_1234567890")],
                        cooldown=60.0, state_path=state)
-        pool.rotate(key="AIzaSECRET_1234567890", status=429, reason="429 Quota exceeded for AIzaSECRET_1234567890")
+        pool.rotate(key="fixture-SECRET_1234567890", status=429, reason="429 Quota exceeded for fixture-SECRET_1234567890")
         raw = state.read_text(encoding="utf-8")
-        self.assertNotIn("AIzaSECRET_1234567890", raw)          # 生のキーは書かない
-        self.assertIn(fingerprint("AIzaSECRET_1234567890"), raw)  # 指紋だけ
+        self.assertNotIn("fixture-SECRET_1234567890", raw)          # 生のキーは書かない
+        self.assertIn(fingerprint("fixture-SECRET_1234567890"), raw)  # 指紋だけ
         # 別のプールでも「制限中」が引き継がれる
-        again = KeyPool([KeyEntry("AIzaSECRET_1234567890"), KeyEntry("AIzaOTHER_1234567890")],
+        again = KeyPool([KeyEntry("fixture-SECRET_1234567890"), KeyEntry("fixture-OTHER_1234567890")],
                         cooldown=60.0, state_path=state)
-        self.assertEqual(again.current, "AIzaOTHER_1234567890")
+        self.assertEqual(again.current, "fixture-OTHER_1234567890")
 
     def test_exhaustion_message_is_helpful_and_masked(self):
         from actor.keys import KeyEntry, KeyPool
 
-        keys = ["AIzaAAAA_1234567890", "AIzaBBBB_1234567890"]
+        keys = ["fixture-AAAA_1234567890", "fixture-BBBB_1234567890"]
         pool = KeyPool([KeyEntry(k, "env", "GEMINI_API_KEYS") for k in keys], cooldown=60.0)
         for key in keys:
             pool.mark_limited(key, status=429, reason=f"429 Quota exceeded for {key}")
         message = pool.exhaustion_message(status=429, last_error=ProviderError("429 Quota exceeded"))
         self.assertIn("すべての Gemini API キーが使えません", message)
-        self.assertIn("AIzaAA…7890", message)
+        self.assertIn("fixtur…7890", message)
         self.assertIn("actor key add", message)
         for key in keys:
             self.assertNotIn(key, message)     # 生のキーは出さない
@@ -2155,7 +2155,7 @@ class KeyPoolTest(unittest.TestCase):
         """サーバーは複数スレッドから同じプールを使う（壊れないこと）。"""
         from actor.keys import KeyEntry, KeyPool
 
-        keys = [f"AIzaTHREAD{i}_1234567890" for i in range(3)]
+        keys = [f"fixture-THREAD{i}_1234567890" for i in range(3)]
         pool = KeyPool([KeyEntry(k) for k in keys], cooldown=60.0, state_path=self.data / "key_state.json")
         errors: list = []
 
@@ -2183,11 +2183,11 @@ class KeyPoolTest(unittest.TestCase):
     def test_mask_and_redact(self):
         from actor.keys import mask_key, redact, split_keys
 
-        self.assertEqual(mask_key("AIzaSyABCDEFGHIJ"), "AIzaSy…GHIJ")
+        self.assertEqual(mask_key("fixture-SyABCDEFGHIJ"), "fixtur…GHIJ")
         self.assertEqual(mask_key("short"), "＊＊＊＊＊")
-        text = redact("Quota exceeded for AIzaSyABCDEFGHIJ please retry", ["AIzaSyABCDEFGHIJ"])
-        self.assertNotIn("AIzaSyABCDEFGHIJ", text)
-        self.assertIn("AIzaSy…GHIJ", text)
+        text = redact("Quota exceeded for fixture-SyABCDEFGHIJ please retry", ["fixture-SyABCDEFGHIJ"])
+        self.assertNotIn("fixture-SyABCDEFGHIJ", text)
+        self.assertIn("fixtur…GHIJ", text)
         self.assertEqual(split_keys("a,b  c;d"), ["a", "b", "c", "d"])
 
 
@@ -2232,7 +2232,7 @@ class KeyRotationTest(unittest.TestCase):
         return provider.generate([{"role": "user", "content": text}])
 
     def test_429_switches_to_next_key(self):
-        keys = ["AIzaAAAA_1234567890", "AIzaBBBB_1234567890"]
+        keys = ["fixture-AAAA_1234567890", "fixture-BBBB_1234567890"]
         _FakeRotatingGemini.limited = {keys[0]}
         settings = self.make(keys)
         result = self.call(settings)
@@ -2244,7 +2244,7 @@ class KeyRotationTest(unittest.TestCase):
         self.assertEqual(pool.rotations, 1)
 
     def test_ready_key_is_reused(self):
-        keys = ["AIzaAAAA_1234567890", "AIzaBBBB_1234567890"]
+        keys = ["fixture-AAAA_1234567890", "fixture-BBBB_1234567890"]
         _FakeRotatingGemini.limited = {keys[0]}
         settings = self.make(keys)
         self.call(settings)
@@ -2252,7 +2252,7 @@ class KeyRotationTest(unittest.TestCase):
         self.assertEqual(_FakeRotatingGemini.seen, [keys[0], keys[1], keys[1]])
 
     def test_all_keys_limited_raises_clear_error(self):
-        keys = ["AIzaAAAA_1234567890", "AIzaBBBB_1234567890"]
+        keys = ["fixture-AAAA_1234567890", "fixture-BBBB_1234567890"]
         _FakeRotatingGemini.limited = set(keys)
         settings = self.make(keys)
         with self.assertRaises(ProviderError) as ctx:
@@ -2265,7 +2265,7 @@ class KeyRotationTest(unittest.TestCase):
             self.assertNotIn(key, message)      # API 本文に混ざったキーも伏せる
 
     def test_rotation_can_be_disabled(self):
-        keys = ["AIzaAAAA_1234567890", "AIzaBBBB_1234567890"]
+        keys = ["fixture-AAAA_1234567890", "fixture-BBBB_1234567890"]
         _FakeRotatingGemini.limited = {keys[0]}
         settings = self.make(keys, key_rotate=False)
         with self.assertRaises(ProviderError) as ctx:
@@ -2274,7 +2274,7 @@ class KeyRotationTest(unittest.TestCase):
         self.assertNotIn(keys[1], _FakeRotatingGemini.seen)   # 切り替えない（従来どおり）
 
     def test_stream_rotates_before_first_chunk(self):
-        keys = ["AIzaAAAA_1234567890", "AIzaBBBB_1234567890"]
+        keys = ["fixture-AAAA_1234567890", "fixture-BBBB_1234567890"]
         _FakeRotatingGemini.limited = {keys[0]}
         settings = self.make(keys)
         events = list(get_provider(settings).stream([{"role": "user", "content": "やあ"}]))
@@ -2282,7 +2282,7 @@ class KeyRotationTest(unittest.TestCase):
         self.assertEqual(_FakeRotatingGemini.seen, keys)
 
     def test_stream_reports_exhaustion(self):
-        keys = ["AIzaAAAA_1234567890", "AIzaBBBB_1234567890"]
+        keys = ["fixture-AAAA_1234567890", "fixture-BBBB_1234567890"]
         _FakeRotatingGemini.limited = set(keys)
         settings = self.make(keys)
         events = list(get_provider(settings).stream([{"role": "user", "content": "やあ"}]))
@@ -2291,7 +2291,7 @@ class KeyRotationTest(unittest.TestCase):
         self.assertIn("すべての Gemini API キーが使えません", errors[0]["text"])
 
     def test_network_error_does_not_burn_keys(self):
-        keys = ["AIzaAAAA_1234567890", "AIzaBBBB_1234567890"]
+        keys = ["fixture-AAAA_1234567890", "fixture-BBBB_1234567890"]
         settings = self.make(keys)
         settings.base_url = "http://127.0.0.1:9"
         with self.assertRaises(ProviderError):
@@ -2301,7 +2301,7 @@ class KeyRotationTest(unittest.TestCase):
         self.assertEqual(pool.rotations, 0)
 
     def test_single_key_429_is_reported_once(self):
-        keys = ["AIzaONLY_1234567890"]
+        keys = ["fixture-ONLY_1234567890"]
         settings = self.make(keys)
         _FakeRotatingGemini.limited = set(keys)
         with self.assertRaises(ProviderError) as ctx:
@@ -2310,11 +2310,11 @@ class KeyRotationTest(unittest.TestCase):
         self.assertEqual(_FakeRotatingGemini.seen, [keys[0]])   # 無駄な再試行をしない
 
     def test_health_reports_key_pool(self):
-        keys = ["AIzaAAAA_1234567890", "AIzaBBBB_1234567890"]
+        keys = ["fixture-AAAA_1234567890", "fixture-BBBB_1234567890"]
         settings = self.make(keys)
         health = get_provider(settings).health()
         self.assertEqual(health["keys"]["count"], 2)
-        self.assertEqual(health["api_key_masked"], "AIzaAA…7890")
+        self.assertEqual(health["api_key_masked"], "fixtur…7890")
         self.assertNotIn(keys[0], json.dumps(health))
 
 
@@ -2355,7 +2355,7 @@ class GenAiKeyRotationTest(unittest.TestCase):
     def test_generate_rotates_on_429(self):
         from actor.genai_provider import GenAiProvider
 
-        keys = ["AIzaSDK1_1234567890", "AIzaSDK2_1234567890"]
+        keys = ["fixture-SDK1_1234567890", "fixture-SDK2_1234567890"]
         _FakeRotatingGemini.limited = {keys[0]}
         _FakeRotatingGemini.seen = []
         settings = self.make(keys)
@@ -2368,7 +2368,7 @@ class GenAiKeyRotationTest(unittest.TestCase):
     def test_generate_reports_exhaustion(self):
         from actor.genai_provider import GenAiProvider
 
-        keys = ["AIzaSDK1_1234567890", "AIzaSDK2_1234567890"]
+        keys = ["fixture-SDK1_1234567890", "fixture-SDK2_1234567890"]
         _FakeRotatingGemini.limited = set(keys)
         _FakeRotatingGemini.seen = []
         settings = self.make(keys)
@@ -2416,8 +2416,8 @@ class KeyCliTest(unittest.TestCase):
                               cwd=str(Path(__file__).resolve().parent.parent))
 
     def test_add_list_rm_clear(self):
-        first = "AIzaCLIADD1_1234567890"
-        second = "AIzaCLIADD2_1234567890"
+        first = "fixture-CLIADD1_1234567890"
+        second = "fixture-CLIADD2_1234567890"
 
         added = self.run_cli(["key", "add", "--stdin"], stdin=f"{first}\n")
         self.assertEqual(added.returncode, 0, added.stderr)
@@ -2431,7 +2431,7 @@ class KeyCliTest(unittest.TestCase):
         listing = self.run_cli(["key", "list"])
         self.assertEqual(listing.returncode, 0, listing.stderr)
         self.assertIn("API キー 2 本", listing.stdout)
-        self.assertIn("AIzaCL…7890", listing.stdout)
+        self.assertIn("fixtur…7890", listing.stdout)
         self.assertNotIn(first, listing.stdout)
 
         payload = json.loads(self.run_cli(["key", "list", "--json"]).stdout)
@@ -2462,7 +2462,7 @@ class KeyCliTest(unittest.TestCase):
         self.assertEqual(self.run_cli(["key", "rm", "5"]).returncode, 2)
 
         # clear で全部（保存ファイルと keys ディレクトリ）
-        self.run_cli(["key", "set", "--stdin"], stdin="AIzaCLISET1_1234567890\n")
+        self.run_cli(["key", "set", "--stdin"], stdin="fixture-CLISET1_1234567890\n")
         cleared = self.run_cli(["key", "clear"])
         self.assertEqual(cleared.returncode, 0, cleared.stderr)
         self.assertIn("削除しました", cleared.stdout)
@@ -2471,7 +2471,7 @@ class KeyCliTest(unittest.TestCase):
         self.assertIn("未設定", self.run_cli(["key", "show"]).stdout)
 
     def test_env_keys_are_listed_and_not_deletable(self):
-        env = {"GEMINI_API_KEYS": "AIzaENVONE_1234567890,AIzaENVTWO_1234567890"}
+        env = {"GEMINI_API_KEYS": "fixture-ENVONE_1234567890,fixture-ENVTWO_1234567890"}
         listing = self.run_cli(["key", "list", "--json"], extra_env=env)
         payload = json.loads(listing.stdout)
         self.assertEqual(payload["count"], 2)
@@ -2480,7 +2480,7 @@ class KeyCliTest(unittest.TestCase):
         self.assertTrue(payload["keys"][0]["active"])
 
         shown = self.run_cli(["key", "show"], extra_env=env)
-        self.assertIn("AIzaEN…7890", shown.stdout)
+        self.assertIn("fixtur…7890", shown.stdout)
         self.assertIn("キー 2 本", shown.stdout)
 
         # 環境変数のキーは削除できない（どこを直すか案内する）
@@ -2489,7 +2489,7 @@ class KeyCliTest(unittest.TestCase):
         self.assertIn("環境変数", refused.stdout)
 
     def test_check_reports_each_key(self):
-        keys = ["AIzaCHK1_1234567890", "AIzaCHK2_1234567890"]
+        keys = ["fixture-CHK1_1234567890", "fixture-CHK2_1234567890"]
         checked = self.run_cli(
             ["key", "check", "--base-url", self.base],
             extra_env={"GEMINI_API_KEYS": ",".join(keys)},
@@ -2534,7 +2534,7 @@ class KeyRotationChatTest(unittest.TestCase):
         self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
         self.thread.start()
         base = f"http://127.0.0.1:{self.httpd.server_address[1]}"
-        keys = ["AIzaCHAT1_1234567890", "AIzaCHAT2_1234567890"]
+        keys = ["fixture-CHAT1_1234567890", "fixture-CHAT2_1234567890"]
         from actor.keys import KeyEntry
 
         self.keys = keys
@@ -2585,8 +2585,8 @@ class EnvFileKeyTest(unittest.TestCase):
         self.data = self.root / ".actor"
         self.env_path = self.root / ".env"
         self.env_path.write_text(
-            "# Actor の設定\nexport GEMINI_API_KEYS=AIzaOLD1_1234567890\n"
-            "GEMINI_API_KEY=AIzaSINGLE_1234567890\nACTOR_MODEL=gemini-3-flash\n",
+            "# Actor の設定\nexport GEMINI_API_KEYS=fixture-OLD1_1234567890\n"
+            "GEMINI_API_KEY=fixture-SINGLE_1234567890\nACTOR_MODEL=gemini-3-flash\n",
             encoding="utf-8",
         )
         self.settings = load_settings(env={"ACTOR_DATA_DIR": str(self.data)}, env_file=self.env_path)
@@ -2597,63 +2597,63 @@ class EnvFileKeyTest(unittest.TestCase):
     def test_append_keeps_comments_and_order(self):
         from actor.config import append_key_to_env_file
 
-        path = append_key_to_env_file(self.settings, "AIzaNEW_1234567890")
+        path = append_key_to_env_file(self.settings, "fixture-NEW_1234567890")
         self.assertEqual(path, self.env_path)
         text = self.env_path.read_text(encoding="utf-8")
-        self.assertIn("export GEMINI_API_KEYS=AIzaOLD1_1234567890,AIzaNEW_1234567890", text)
+        self.assertIn("export GEMINI_API_KEYS=fixture-OLD1_1234567890,fixture-NEW_1234567890", text)
         self.assertIn("# Actor の設定", text)                 # コメントは残る
         self.assertIn("ACTOR_MODEL=gemini-3-flash", text)     # 他の変数も残る
-        self.assertNotIn("AIzaNEW_1234567890\nAIzaNEW", text)  # 追記は 1 回だけ
+        self.assertNotIn("fixture-NEW_1234567890\nfixture-NEW", text)  # 追記は 1 回だけ
         if os.name != "nt":
             self.assertEqual(oct(self.env_path.stat().st_mode & 0o777), "0o600")
 
         # 同じキーをもう一度足しても増えない
-        append_key_to_env_file(self.settings, "AIzaNEW_1234567890")
-        self.assertEqual(self.env_path.read_text(encoding="utf-8").count("AIzaNEW_1234567890"), 1)
+        append_key_to_env_file(self.settings, "fixture-NEW_1234567890")
+        self.assertEqual(self.env_path.read_text(encoding="utf-8").count("fixture-NEW_1234567890"), 1)
 
         # 読み直すと 3 本になる（1 行目が最優先）
         refreshed = load_settings(env={"ACTOR_DATA_DIR": str(self.data)}, env_file=self.env_path)
         self.assertEqual(refreshed.api_keys,
-                         ["AIzaOLD1_1234567890", "AIzaNEW_1234567890", "AIzaSINGLE_1234567890"])
+                         ["fixture-OLD1_1234567890", "fixture-NEW_1234567890", "fixture-SINGLE_1234567890"])
 
     def test_append_creates_env_file_when_missing(self):
         from actor.config import append_key_to_env_file
 
         missing = self.root / "sub" / ".env"
         settings = load_settings(env={"ACTOR_DATA_DIR": str(self.data)}, env_file=missing)
-        path = append_key_to_env_file(settings, "AIzaFRESH_1234567890")
+        path = append_key_to_env_file(settings, "fixture-FRESH_1234567890")
         self.assertEqual(path, missing)
         self.assertEqual(missing.read_text(encoding="utf-8").strip(),
-                         "GEMINI_API_KEYS=AIzaFRESH_1234567890")
+                         "GEMINI_API_KEYS=fixture-FRESH_1234567890")
 
     def test_append_prefers_existing_single_key_variable(self):
         from actor.config import append_key_to_env_file
 
-        self.env_path.write_text("GEMINI_API_KEY=AIzaSINGLE_1234567890\n", encoding="utf-8")
+        self.env_path.write_text("GEMINI_API_KEY=fixture-SINGLE_1234567890\n", encoding="utf-8")
         settings = load_settings(env={"ACTOR_DATA_DIR": str(self.data)}, env_file=self.env_path)
-        append_key_to_env_file(settings, "AIzaEXTRA_1234567890", var="GEMINI_API_KEY")
+        append_key_to_env_file(settings, "fixture-EXTRA_1234567890", var="GEMINI_API_KEY")
         text = self.env_path.read_text(encoding="utf-8")
-        self.assertEqual(text.strip(), "GEMINI_API_KEY=AIzaSINGLE_1234567890,AIzaEXTRA_1234567890")
+        self.assertEqual(text.strip(), "GEMINI_API_KEY=fixture-SINGLE_1234567890,fixture-EXTRA_1234567890")
         self.assertEqual(len(load_settings(env={"ACTOR_DATA_DIR": str(self.data)},
                                            env_file=self.env_path).api_keys), 2)
 
     def test_remove_key_from_env_file(self):
         from actor.config import remove_key_from_env_file
 
-        self.assertTrue(remove_key_from_env_file(self.settings, "AIzaOLD1_1234567890"))
+        self.assertTrue(remove_key_from_env_file(self.settings, "fixture-OLD1_1234567890"))
         text = self.env_path.read_text(encoding="utf-8")
         self.assertIn("export GEMINI_API_KEYS=", text)          # 行は残す（空にする）
-        self.assertNotIn("AIzaOLD1_1234567890", text)
-        self.assertIn("GEMINI_API_KEY=AIzaSINGLE_1234567890", text)
+        self.assertNotIn("fixture-OLD1_1234567890", text)
+        self.assertIn("GEMINI_API_KEY=fixture-SINGLE_1234567890", text)
         # 残りは 1 本だけ
         refreshed = load_settings(env={"ACTOR_DATA_DIR": str(self.data)}, env_file=self.env_path)
-        self.assertEqual(refreshed.api_keys, ["AIzaSINGLE_1234567890"])
+        self.assertEqual(refreshed.api_keys, ["fixture-SINGLE_1234567890"])
 
         # 単数キーの行からも消せる
-        self.assertTrue(remove_key_from_env_file(self.settings, "AIzaSINGLE_1234567890"))
-        self.assertNotIn("AIzaSINGLE_1234567890", self.env_path.read_text(encoding="utf-8"))
+        self.assertTrue(remove_key_from_env_file(self.settings, "fixture-SINGLE_1234567890"))
+        self.assertNotIn("fixture-SINGLE_1234567890", self.env_path.read_text(encoding="utf-8"))
         # 無いキーなら False
-        self.assertFalse(remove_key_from_env_file(self.settings, "AIzaNOPE_1234567890"))
+        self.assertFalse(remove_key_from_env_file(self.settings, "fixture-NOPE_1234567890"))
 
     def test_removed_env_key_is_reported_with_path(self):
         """``key list`` の items に「どこに書いてあるか」が出る（rm の案内用）。"""
@@ -2672,7 +2672,7 @@ class KeyStatsTest(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def make_pool(self, keys=("AIzaAAAA_1234567890", "AIzaBBBB_1234567890"), **kw):
+    def make_pool(self, keys=("fixture-AAAA_1234567890", "fixture-BBBB_1234567890"), **kw):
         from actor.keys import KeyEntry, KeyPool
 
         return KeyPool([KeyEntry(k, "env", "GEMINI_API_KEYS") for k in keys],
@@ -2680,9 +2680,9 @@ class KeyStatsTest(unittest.TestCase):
 
     def test_counts_survive_reload(self):
         pool = self.make_pool(cooldown=0.0)
-        pool.mark_ok("AIzaAAAA_1234567890")
-        pool.rotate(key="AIzaAAAA_1234567890", status=429, reason="429 Quota exceeded")
-        pool.rotate(key="AIzaBBBB_1234567890", status=429, reason="429 Quota exceeded")
+        pool.mark_ok("fixture-AAAA_1234567890")
+        pool.rotate(key="fixture-AAAA_1234567890", status=429, reason="429 Quota exceeded")
+        pool.rotate(key="fixture-BBBB_1234567890", status=429, reason="429 Quota exceeded")
 
         again = self.make_pool(cooldown=0.0)
         stats = again.stats()
@@ -2691,12 +2691,12 @@ class KeyStatsTest(unittest.TestCase):
         self.assertGreater(stats["updated"], 0)
 
     def test_worst_key_is_the_most_limited(self):
-        pool = self.make_pool(keys=("AIzaAAAA_1234567890", "AIzaBBBB_1234567890"), cooldown=0.0)
+        pool = self.make_pool(keys=("fixture-AAAA_1234567890", "fixture-BBBB_1234567890"), cooldown=0.0)
         for _ in range(3):
-            pool.mark_ok("AIzaBBBB_1234567890")
-        pool.mark_limited("AIzaAAAA_1234567890", status=429, reason="429")
+            pool.mark_ok("fixture-BBBB_1234567890")
+        pool.mark_limited("fixture-AAAA_1234567890", status=429, reason="429")
         stats = pool.stats()
-        self.assertEqual(stats["worst"]["masked"], "AIzaAA…7890")
+        self.assertEqual(stats["worst"]["masked"], "fixtur…7890")
         self.assertEqual(stats["worst"]["limits"], 1)
         self.assertEqual(stats["worst"]["attempts"], 1)
         other = next(item for item in stats["keys"] if item["index"] == 1)
@@ -2704,30 +2704,30 @@ class KeyStatsTest(unittest.TestCase):
         self.assertEqual(other["limit_rate"], 0.0)
 
     def test_stats_never_leak_keys(self):
-        keys = ["AIzaSECRET1_1234567890", "AIzaSECRET2_1234567890"]
+        keys = ["fixture-SECRET1_1234567890", "fixture-SECRET2_1234567890"]
         pool = self.make_pool(keys=keys, cooldown=0.0)
         for key in keys:
             pool.mark_limited(key, status=429, reason=f"429 Quota exceeded for {key}")
         dump = json.dumps(pool.stats(), ensure_ascii=False)
         for key in keys:
             self.assertNotIn(key, dump)
-        self.assertIn("AIzaSE…7890", dump)
+        self.assertIn("fixtur…7890", dump)
         self.assertNotIn(keys[0], (self.data / "key_state.json").read_text(encoding="utf-8"))
 
     def test_reset_stats_clears_counts_and_limits(self):
         pool = self.make_pool(cooldown=60.0)
-        pool.mark_ok("AIzaAAAA_1234567890")
-        pool.rotate(key="AIzaAAAA_1234567890", status=429, reason="429")
+        pool.mark_ok("fixture-AAAA_1234567890")
+        pool.rotate(key="fixture-AAAA_1234567890", status=429, reason="429")
         pool.reset_stats()
         stats = pool.stats()
         self.assertEqual(stats["totals"], {"requests": 0, "limits": 0, "rotations": 0})
         self.assertEqual([item["limits"] for item in stats["keys"]], [0, 0])
         self.assertEqual(stats["ready"], 2)          # 「制限中」の印も消える
-        self.assertTrue(pool.is_ready("AIzaAAAA_1234567890"))
+        self.assertTrue(pool.is_ready("fixture-AAAA_1234567890"))
 
     def test_stale_records_are_counted(self):
         pool = self.make_pool(cooldown=0.0)
-        pool.mark_limited("AIzaGONE_1234567890", status=429, reason="429")
+        pool.mark_limited("fixture-GONE_1234567890", status=429, reason="429")
         stats = pool.stats()
         self.assertEqual(stats["stale_records"], 1)   # 一覧に無いキーの記録
         self.assertEqual(stats["count"], 2)
@@ -2771,15 +2771,15 @@ class KeyStatsCliTest(unittest.TestCase):
 
     def test_add_env_appends_and_lists(self):
         env_path = self.root / ".env"
-        env_path.write_text("# メモ\nexport GEMINI_API_KEYS=AIzaFIRST_1234567890\n", encoding="utf-8")
-        key = "AIzaSECOND_1234567890"
+        env_path.write_text("# メモ\nexport GEMINI_API_KEYS=fixture-FIRST_1234567890\n", encoding="utf-8")
+        key = "fixture-SECOND_1234567890"
 
         added = self.run_cli(["key", "add", "--env", "--stdin", "--env-file", str(env_path)], stdin=f"{key}\n")
         self.assertEqual(added.returncode, 0, added.stderr)
         self.assertIn("追加しました", added.stdout)
         self.assertNotIn(key, added.stdout)                     # 生のキーは出さない
         text = env_path.read_text(encoding="utf-8")
-        self.assertIn(f"export GEMINI_API_KEYS=AIzaFIRST_1234567890,{key}", text)
+        self.assertIn(f"export GEMINI_API_KEYS=fixture-FIRST_1234567890,{key}", text)
         self.assertIn("# メモ", text)
 
         listing = json.loads(self.run_cli(["key", "list", "--json", "--env-file", str(env_path)]).stdout)
@@ -2795,7 +2795,7 @@ class KeyStatsCliTest(unittest.TestCase):
         self.assertEqual(json.loads(self.run_cli(["key", "list", "--json", "--env-file", str(env_path)]).stdout)["count"], 1)
 
     def test_stats_after_429(self):
-        keys = ["AIzaSTAT1_1234567890", "AIzaSTAT2_1234567890"]
+        keys = ["fixture-STAT1_1234567890", "fixture-STAT2_1234567890"]
         _FakeRotatingGemini.limited = {keys[0]}
         env = {"GEMINI_API_KEYS": ",".join(keys), "ACTOR_BASE_URL": self.base}
         turn = self.run_cli(["--no-banner", "やあ"], extra_env=env)
@@ -2806,7 +2806,7 @@ class KeyStatsCliTest(unittest.TestCase):
         self.assertIn("API キーの利用統計", stats.stdout)
         self.assertIn("429 で切れた 1 回", stats.stdout)
         self.assertIn("よく切れているキー", stats.stdout)
-        self.assertIn("AIzaST…7890", stats.stdout)
+        self.assertIn("fixtur…7890", stats.stdout)
         for key in keys:
             self.assertNotIn(key, stats.stdout)
 
@@ -2929,7 +2929,7 @@ class ModelFallbackTest(unittest.TestCase):
         self.root = Path(self.tmp.name)
         _FakeModelGemini.seen = []
         _FakeModelGemini.limited_models = set()
-        keys = ["AIzaFB1_1234567890", "AIzaFB2_1234567890"]
+        keys = ["fixture-FB1_1234567890", "fixture-FB2_1234567890"]
         self.keys = keys
         self.settings = Settings(api_key=keys[0], api_keys=list(keys), base_url=self.base,
                                  model="gemini-3.8-flash", data_dir=self.root / ".actor",
@@ -2944,13 +2944,13 @@ class ModelFallbackTest(unittest.TestCase):
         return [model for model, _key in _FakeModelGemini.seen]
 
     def test_default_fallbacks_come_from_settings(self):
-        settings = load_settings(env={"GEMINI_API_KEY": "AIzaX_1234567890"},
+        settings = load_settings(env={"GEMINI_API_KEY": "fixture-X_1234567890"},
                                  env_file=self.root / "no-such.env")
         self.assertEqual(settings.model_fallbacks, ["gemini-3.5-flash", "gemini-2.5-flash"])
-        disabled = load_settings(env={"GEMINI_API_KEY": "AIzaX_1234567890", "ACTOR_MODEL_FALLBACKS": ""},
+        disabled = load_settings(env={"GEMINI_API_KEY": "fixture-X_1234567890", "ACTOR_MODEL_FALLBACKS": ""},
                                  env_file=self.root / "no-such.env")
         self.assertEqual(disabled.model_fallbacks, [])
-        custom = load_settings(env={"GEMINI_API_KEY": "AIzaX_1234567890",
+        custom = load_settings(env={"GEMINI_API_KEY": "fixture-X_1234567890",
                                     "ACTOR_MODEL_FALLBACKS": "gemini-x, gemini-y"},
                                env_file=self.root / "no-such.env")
         self.assertEqual(custom.model_fallbacks, ["gemini-x", "gemini-y"])
@@ -3111,10 +3111,10 @@ class GenAiModelFallbackTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
         _FakeModelGemini.seen = []
-        self.settings = Settings(api_key="AIzaSDKFB_1234567890", provider="genai", base_url=self.base,
+        self.settings = Settings(api_key="fixture-SDKFB_1234567890", provider="genai", base_url=self.base,
                                  model="gemini-3.8-flash", data_dir=self.root / ".actor",
                                  model_fallbacks=["gemini-3.5-flash"])
-        self.settings.key_entries = [KeyEntry("AIzaSDKFB_1234567890", "env", "GEMINI_API_KEY")]
+        self.settings.key_entries = [KeyEntry("fixture-SDKFB_1234567890", "env", "GEMINI_API_KEY")]
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -3147,7 +3147,7 @@ class VertexExpressTest(unittest.TestCase):
     def test_url_shape_for_express_mode(self):
         from actor.providers import GeminiProvider
 
-        settings = load_settings(env={"GEMINI_API_KEY": "AIzaEXPRESS_1234567890",
+        settings = load_settings(env={"GEMINI_API_KEY": "fixture-EXPRESS_1234567890",
                                       "ACTOR_BASE_URL": "https://aiplatform.googleapis.com"},
                                  env_file="/nonexistent")
         self.assertEqual(settings.api_version, "v1")
@@ -3162,14 +3162,14 @@ class VertexExpressTest(unittest.TestCase):
     def test_default_shape_stays_v1beta(self):
         from actor.providers import GeminiProvider
 
-        settings = load_settings(env={"GEMINI_API_KEY": "AIzaNORMAL_1234567890"},
+        settings = load_settings(env={"GEMINI_API_KEY": "fixture-NORMAL_1234567890"},
                                  env_file="/nonexistent")
         provider = GeminiProvider(settings)
         self.assertTrue(provider._url("generateContent", model="gemini-3-flash").endswith(
             "/v1beta/models/gemini-3-flash:generateContent"))
 
     def test_explicit_api_shape_can_be_overridden(self):
-        settings = load_settings(env={"GEMINI_API_KEY": "AIzaX_1234567890",
+        settings = load_settings(env={"GEMINI_API_KEY": "fixture-X_1234567890",
                                       "ACTOR_API_VERSION": "v1",
                                       "ACTOR_MODEL_PATH": "openai/models/{model}"},
                                  env_file="/nonexistent")
@@ -3204,7 +3204,7 @@ class VertexExpressTest(unittest.TestCase):
         thread.start()
         try:
             base = f"http://127.0.0.1:{httpd.server_address[1]}"
-            settings = Settings(api_key="AIzaEXPRESS_1234567890", base_url=base,
+            settings = Settings(api_key="fixture-EXPRESS_1234567890", base_url=base,
                                 model="gemini-3.8-flash", api_version="v1",
                                 model_path="publishers/google/models/{model}", tools=[])
             result = get_provider(settings).generate([{"role": "user", "content": "やあ"}])
@@ -3245,7 +3245,7 @@ class KeySourcesTest(unittest.TestCase):
         self.assertTrue(any("aistudio" in item["url"] for item in payload["sources"]))
         self.assertEqual(payload["caution"], KEY_SOURCES_CAUTION)
         # どこにも生のキーは出てこない
-        self.assertNotIn("AIza", result.stdout)
+        self.assertNotIn("fixture-", result.stdout)
 
     def test_no_key_hint_points_to_sources(self):
         result = self.run_cli(["key", "show"])
@@ -3293,15 +3293,15 @@ class KeyCliModelTest(unittest.TestCase):
 
     def test_list_json_has_models(self):
         payload = json.loads(self.run_cli(
-            ["key", "list", "--json"], {"GEMINI_API_KEYS": "AIzaM1_1234567890,AIzaM2_1234567890"}).stdout)
+            ["key", "list", "--json"], {"GEMINI_API_KEYS": "fixture-M1_1234567890,fixture-M2_1234567890"}).stdout)
         self.assertEqual(payload["model"], "gemini-3.8-flash")
         self.assertEqual(payload["model_fallbacks"], ["gemini-3.5-flash", "gemini-2.5-flash"])
         self.assertEqual(payload["ready_by_model"]["gemini-3.8-flash"], 2)
-        self.assertNotIn("AIzaM1_1234567890", json.dumps(payload))
+        self.assertNotIn("fixture-M1_1234567890", json.dumps(payload))
 
     def test_run_falls_back_and_reports_notice(self):
         _FakeModelGemini.limited_models = {"gemini-3.8-flash"}
-        env = {"GEMINI_API_KEY": "AIzaCLIFB_1234567890"}
+        env = {"GEMINI_API_KEY": "fixture-CLIFB_1234567890"}
         result = self.run_cli(["--no-banner", "やあ"], env)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("🔁", result.stdout)
@@ -3312,12 +3312,12 @@ class KeyCliModelTest(unittest.TestCase):
         self.assertEqual(payload["model"], "gemini-3.5-flash")
         self.assertEqual(payload["requested_model"], "gemini-3.8-flash")
         self.assertEqual(payload["notices"][0]["kind"], "model_fallback")
-        self.assertNotIn("AIzaCLIFB_1234567890", json.dumps(payload))
+        self.assertNotIn("fixture-CLIFB_1234567890", json.dumps(payload))
 
     def test_custom_fallback_model_is_used_first(self):
         _FakeModelGemini.limited_models = {"gemini-3.8-flash", "gemini-3.5-flash"}
         result = self.run_cli(["--no-banner", "--fallback-model", "gemini-2.5-flash", "やあ"],
-                             {"GEMINI_API_KEY": "AIzaCLIFB2_1234567890"})
+                             {"GEMINI_API_KEY": "fixture-CLIFB2_1234567890"})
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual([model for model, _key in _FakeModelGemini.seen][-1], "gemini-2.5-flash")
         self.assertIn("[gemini-2.5-flash] 回答です。", result.stdout)
@@ -3325,7 +3325,7 @@ class KeyCliModelTest(unittest.TestCase):
     def test_no_model_fallback_keeps_error(self):
         _FakeModelGemini.limited_models = {"gemini-3.8-flash"}
         result = self.run_cli(["--no-banner", "--no-model-fallback", "やあ"],
-                              {"GEMINI_API_KEY": "AIzaCLIFB3_1234567890"})
+                              {"GEMINI_API_KEY": "fixture-CLIFB3_1234567890"})
         self.assertEqual(result.returncode, 1)
         self.assertIn("すべての Gemini API キーが使えません", result.stdout)
         self.assertIn("試したモデル: gemini-3.8-flash", result.stdout)
@@ -3333,7 +3333,7 @@ class KeyCliModelTest(unittest.TestCase):
 
     def test_stats_show_model_sections(self):
         _FakeModelGemini.limited_models = {"gemini-3.8-flash"}
-        env = {"GEMINI_API_KEY": "AIzaCLISTATS_1234567890"}
+        env = {"GEMINI_API_KEY": "fixture-CLISTATS_1234567890"}
         self.run_cli(["--no-banner", "やあ"], env)
         stats = self.run_cli(["key", "stats"], env)
         self.assertEqual(stats.returncode, 0, stats.stderr)
