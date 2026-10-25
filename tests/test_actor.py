@@ -1233,6 +1233,18 @@ class CliArgTest(unittest.TestCase):
             build_parser().parse_args(["skills", "--help"])
         self.assertIn("[list|show|new|rm|export|lint|test|path]", output.getvalue())
 
+    def test_cli_brand_uses_actor_si_product_name(self):
+        import io
+        from contextlib import redirect_stdout
+        from actor.cli import BANNER, build_parser
+
+        self.assertIn("Actor-si", BANNER)
+        output = io.StringIO()
+        with redirect_stdout(output), self.assertRaises(SystemExit) as raised:
+            build_parser().parse_args(["--version"])
+        self.assertEqual(raised.exception.code, 0)
+        self.assertIn("Actor-si", output.getvalue())
+
     def test_parser_accepts_each_command(self):
         from actor.cli import build_parser, _split_command
 

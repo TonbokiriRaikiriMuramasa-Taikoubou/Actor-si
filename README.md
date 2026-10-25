@@ -1,12 +1,12 @@
-# Actor
+# Actor-si
 
 [![Tests](https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si/actions/workflows/tests.yml/badge.svg)](https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si/actions/workflows/tests.yml)
 
-Actor-si is a local-first workbench for authoring, linting, testing, and packaging portable Agent Skills. Its CLI, HTTP API, and web UI load `SKILL.md` folders as system instructions and run them with Gemini; core features use Python's standard library. Skills can be selected automatically, composed with references, and checked before use. The server binds to loopback by default; external binding requires an API token, and browser cross-origin access requires an explicit allowlist.
+Actor-si (the `actor` CLI command) is a local-first workbench for authoring, linting, testing, and packaging portable Agent Skills. Its CLI, HTTP API, and web UI load `SKILL.md` folders as system instructions and run them with Gemini; core features use Python's standard library. Skills can be selected automatically, composed with references, and checked before use. The server binds to loopback by default; external binding requires an API token, and browser cross-origin access requires an explicit allowlist.
 
 ## Overview
 
-Actor loads folders that follow the open, Markdown-native Agent Skills `SKILL.md` format and can:
+Actor-si loads folders that follow the open, Markdown-native Agent Skills `SKILL.md` format and can:
 
 - Stack multiple skills into one `system_instruction`.
 - Select skills deterministically from a request, with a configurable threshold.
@@ -19,14 +19,14 @@ Actor loads folders that follow the open, Markdown-native Agent Skills `SKILL.md
 ```text
 ┌────────────┐   /skills/<name>/SKILL.md   ┌──────────────┐
 │ CLI        │──┐                          │ system_      │
-│ Web UI     │──┼──▶ Actor (SkillEngine) ─▶│ instruction  │──▶ Gemini API
+│ Web UI     │──┼──▶ Actor-si ──────────────▶│ instruction  │──▶ Gemini API
 │ HTTP API   │──┘     select / compose     │ + references │
 └────────────┘                             └──────────────┘
 ```
 
 ## What you can use it for
 
-Actor-si is a local workshop for drafting, linting, testing, and packaging portable Agent Skills—not a hosted marketplace or submission service. It also includes five reusable skills for common writing and review tasks. Their descriptions state both `Use when` and `Do not use when` boundaries; use them in Actor or export their folders as ZIPs for compatible hosts. Third-party host compatibility has not been independently verified.
+Actor-si is a local workshop for drafting, linting, testing, and packaging portable Agent Skills—not a hosted marketplace or submission service. It also includes five reusable skills for common writing and review tasks. Their descriptions state both `Use when` and `Do not use when` boundaries; use them in Actor-si or export their folders as ZIPs for compatible hosts. Third-party host compatibility has not been independently verified.
 
 ### Build and check your own skills
 
@@ -37,7 +37,7 @@ python3 -m actor skills lint --target agensi
 python3 -m actor skills test
 ```
 
-Lint checks the ZIP Actor would export, including folder layout, metadata, supported file types and sizes, likely leaked credentials, and risky concealment or prompt-injection instructions. `skills test` checks required output headings and cases without calling a model; `--live` is an opt-in exception that uses the configured provider.
+Lint checks the ZIP Actor-si would export, including folder layout, metadata, supported file types and sizes, likely leaked credentials, and risky concealment or prompt-injection instructions. `skills test` checks required output headings and cases without calling a model; `--live` is an opt-in exception that uses the configured provider.
 
 Export one reproducible ZIP per skill when it is ready:
 
@@ -45,7 +45,7 @@ Export one reproducible ZIP per skill when it is ready:
 python3 -m actor skills export minutes-writer --target agensi -o minutes-writer.zip
 ```
 
-The ZIP includes the canonical MIT `LICENSE` and shared principles. Review the complete archive, then submit it yourself on any service you choose; Actor does not upload, publish, or submit skills.
+The ZIP includes the canonical MIT `LICENSE` and shared principles. Review the complete archive, then submit it yourself on any service you choose; Actor-si does not upload, publish, or submit skills.
 
 ### Use the five bundled skills
 
@@ -57,7 +57,7 @@ The ZIP includes the canonical MIT `LICENSE` and shared principles. Review the c
 
 ### What it is not
 
-Actor-si is not a hosted service, and these bundled skills do not directly act on external systems or submit content. They produce or guide text based on material you provide. Actor's optional network tool is disabled by default and must be explicitly enabled. If you need a skill that operates an external service, this bundle does not provide that integration.
+Actor-si is not a hosted service, and these bundled skills do not directly act on external systems or submit content. They produce or guide text based on material you provide. Actor-si's optional network tool is disabled by default and must be explicitly enabled. If you need a skill that operates an external service, this bundle does not provide that integration.
 
 ## 30-second quickstart
 
@@ -98,17 +98,17 @@ $ python3 -m actor key rm 1
 $ python3 -m actor key clear
 ```
 
-The server never returns raw keys: `/api/config` and `/api/key` expose only masked values, counts, status, and statistics. If a connectivity check fails, a saved key remains in place and Actor continues in simulator mode; a later restart can use the real provider once connectivity is available.
+The server never returns raw keys: `/api/config` and `/api/key` expose only masked values, counts, status, and statistics. If a connectivity check fails, a saved key remains in place and Actor-si continues in simulator mode; a later restart can use the real provider once connectivity is available.
 
 ### When you hit 429 (quota exceeded)
 
-Preview models can return `429 RESOURCE_EXHAUSTED / Quota exceeded`. Actor can rotate through configured keys and, if all keys are limited for the requested model, retry with configured fallback models.
+Preview models can return `429 RESOURCE_EXHAUSTED / Quota exceeded`. Actor-si can rotate through configured keys and, if all keys are limited for the requested model, retry with configured fallback models.
 
-1. **Rotate keys.** A key that receives 429, 401, or 403 is cooled down for `ACTOR_KEY_COOLDOWN` seconds (default: 60; a longer server retry delay takes precedence). Actor reports when every key is limited instead of inventing a response. Use `actor key stats` to inspect counts; raw keys are not written to logs or state files.
-2. **Use a fallback model.** The quota is scoped by project and model. `ACTOR_MODEL_FALLBACKS` defaults to `gemini-3.5-flash,gemini-2.5-flash`. Actor announces a switch; use `--no-model-fallback` to disable it for one run.
+1. **Rotate keys.** A key that receives 429, 401, or 403 is cooled down for `ACTOR_KEY_COOLDOWN` seconds (default: 60; a longer server retry delay takes precedence). Actor-si reports when every key is limited instead of inventing a response. Use `actor key stats` to inspect counts; raw keys are not written to logs or state files.
+2. **Use a fallback model.** The quota is scoped by project and model. `ACTOR_MODEL_FALLBACKS` defaults to `gemini-3.5-flash,gemini-2.5-flash`. Actor-si announces a switch; use `--no-model-fallback` to disable it for one run.
 3. **Review your provider and quota.** `actor key sources` lists official access options. Creating another key in the same project does not increase that project's quota. Do not use multiple accounts to evade provider limits, and do not send sensitive data to a free-tier service unless its data terms are acceptable.
 
-For Vertex AI Express Mode, set `ACTOR_BASE_URL` to `https://aiplatform.googleapis.com`; Actor selects the corresponding API version and model path. See [API key management](docs/keys.md) for configuration details.
+For Vertex AI Express Mode, set `ACTOR_BASE_URL` to `https://aiplatform.googleapis.com`; Actor-si selects the corresponding API version and model path. See [API key management](docs/keys.md) for configuration details.
 
 | Task | Command |
 | --- | --- |
@@ -125,7 +125,7 @@ Run `pip install -e .` if you want the `actor` console command.
 
 ## Always-on bot
 
-An always-on bot is a full Actor instance with its own local skills, model settings, and session history. A room is the shared log where people and bots meet.
+An always-on bot is a full Actor-si instance with its own local skills, model settings, and session history. A room is the shared log where people and bots meet.
 
 ```bash
 # Terminal 1: start the room server
@@ -200,10 +200,10 @@ Invalid or missing tokens receive **403**. The web UI prompts for a token if the
 
 ```text
 $ python3 -m actor
-Actor v0.2.1 — SKILL.md-driven Gemini client
+Actor-si v0.2.1 — SKILL.md-driven Gemini client
 Use /help for commands and /exit to quit.
 Running in simulator mode; configure an API key locally to use Gemini.
-5 skills / data directory: /path/to/Actor/.actor
+5 skills / data directory: /path/to/Actor-si/.actor
 
 you [-,auto|think] › Write release notes from these commits
 ▶ Selected skill: release-notes
@@ -320,11 +320,11 @@ State what the skill achieves.
 - Do not invent or exaggerate facts.
 ````
 
-Use lowercase kebab-case for `name`; keep the folder name identical. Actor supports per-skill generation settings such as `temperature`, `top_p`, `max_output_tokens`, `thinking_budget`, and `model`. A text reference is included in the `system_instruction` up to `ACTOR_INLINE_REFERENCE_LIMIT` (default: 24,000 characters); images and PDFs are sent as inline data. References are size-limited, and nested code fences are wrapped safely when composed into instructions.
+Use lowercase kebab-case for `name`; keep the folder name identical. Actor-si supports per-skill generation settings such as `temperature`, `top_p`, `max_output_tokens`, `thinking_budget`, and `model`. A text reference is included in the `system_instruction` up to `ACTOR_INLINE_REFERENCE_LIMIT` (default: 24,000 characters); images and PDFs are sent as inline data. References are size-limited, and nested code fences are wrapped safely when composed into instructions.
 
 ## Automatic skill selection
 
-Actor deterministically scores the request against skill names, descriptions, and tags using English words and character bigrams.
+Actor-si deterministically scores the request against skill names, descriptions, and tags using English words and character bigrams.
 
 | Match | Score |
 | --- | ---: |
@@ -412,7 +412,7 @@ The `skills test` commands run format-only checks; they do not call a model. `--
 
 ## Security and cautions
 
-- Skills are local Markdown instructions. Actor does not execute scripts embedded in skills; it sends skill text to the provider, which may process it as instructions.
+- Skills are local Markdown instructions. Actor-si does not execute scripts embedded in skills; it sends skill text to the provider, which may process it as instructions.
 - Do not place confidential material in a skill: the body and text references are sent to the provider.
 - Review generated minutes and other outputs before sharing them externally.
 - The server binds to `127.0.0.1` by default. Set `ACTOR_ROOM_TOKEN` before binding to a non-loopback interface; startup is refused without it.
@@ -454,7 +454,7 @@ chat = client.chats.create(
 response = chat.send_message("Hello.")
 ```
 
-| Reference SDK | Actor |
+| Reference SDK | Actor-si |
 | --- | --- |
 | `load_skill_prompt("./skills/mika/SKILL.md")` | `SkillLibrary(...).get("mika")`; multiple skills are composed into one instruction |
 | `temperature=0.85` | Set `temperature: 0.85` in the skill frontmatter |
