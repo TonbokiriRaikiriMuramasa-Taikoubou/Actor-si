@@ -82,8 +82,9 @@ The default skill tests are format-only: they inspect output templates and asser
 
 ## Release and change constraints
 
-- PRs #5–#9 are merged: security hardening; English source and opt-in Japanese skills; English CLI/UI; lint, packaging, auth-header and positioning follow-ups; and finalized v0.2.1 release notes.
-- The annotated `v0.2.1` tag and GitHub Release are published from `main`; release notes are in [`docs/release-notes-v0.2.1.md`](docs/release-notes-v0.2.1.md). For future releases, confirm the reviewed changes are on `main`, the project version is correct, and the tag/release does not already exist; publishing requires explicit maintainer approval.
+- PRs #5–#10 are merged: security hardening; English source and opt-in Japanese skills; English CLI/UI; lint, packaging, auth-header and positioning follow-ups; finalized v0.2.1 notes; and refined Japanese lint plus Actor-si branding.
+- The annotated `v0.2.1` tag and GitHub Release are published from `main`; release notes are in [`docs/release-notes-v0.2.1.md`](docs/release-notes-v0.2.1.md). v0.3.0 release notes are maintained in English and Japanese at [`docs/release-notes-v0.3.0.md`](docs/release-notes-v0.3.0.md) and [`docs/ja/release-notes-v0.3.0.md`](docs/ja/release-notes-v0.3.0.md).
+- Keep `pyproject.toml` and `actor/__init__.py` version values synchronized. Before future release tags, confirm reviewed changes are on `main`, the version is correct, and the tag/release does not already exist; publishing requires explicit maintainer approval.
 - Preserve the published `v0.2.0` tag and Release, including its body. Do not rewrite published history or force-push.
 - Do not modify `examples/mika` unless explicitly asked.
 - Keep Sponsors links in `FUNDING.md`; do not add them to `LISTING.md` or skill ZIPs.

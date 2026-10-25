@@ -200,7 +200,7 @@ Invalid or missing tokens receive **403**. The web UI prompts for a token if the
 
 ```text
 $ python3 -m actor
-Actor-si v0.2.1 — SKILL.md-driven Gemini client
+Actor-si v0.3.0 — SKILL.md-driven Gemini client
 Use /help for commands and /exit to quit.
 Running in simulator mode; configure an API key locally to use Gemini.
 5 skills / data directory: /path/to/Actor-si/.actor
@@ -435,6 +435,7 @@ Keep API keys, room tokens, and webhook secrets out of version control and logs.
 - [Japanese edition](README.ja.md)
 - [Japanese documentation](docs/ja/)
 - [Project handoff](HANDOFF.md)
+- [v0.3.0 release notes](docs/release-notes-v0.3.0.md)
 - [Changelog](CHANGELOG.md)
 
 ## Mapping to the reference SDK

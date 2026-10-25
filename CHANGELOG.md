@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0 — precise Japanese lint and product identity
+
+- Prevent Japanese concealment checks from spanning sentences or lines and suppress false positives for negated concealment statements.
+- Detect additional risky instructions such as uploading without saying anything or sending without the user's permission.
+- Clarify Actor-si as the product name and `actor` as the CLI command in the READMEs and CLI output.
+- Add regression coverage for benign multi-sentence privacy advice, negations, and concealment/action combinations.
+
 ## 0.2.1 — security, compatibility, and skills workbench
 
 - Add a local workflow to draft, lint, test, and export portable Agent Skills; Actor-si does not upload or submit packages.
