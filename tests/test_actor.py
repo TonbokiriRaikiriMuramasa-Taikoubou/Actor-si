@@ -1245,6 +1245,15 @@ class CliArgTest(unittest.TestCase):
         self.assertEqual(raised.exception.code, 0)
         self.assertIn("Actor-si", output.getvalue())
 
+    def test_package_version_matches_project_metadata(self):
+        import re
+        from actor import __version__
+
+        pyproject = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8")
+        match = re.search(r'^version = "([^"]+)"$', pyproject, re.MULTILINE)
+        self.assertIsNotNone(match)
+        self.assertEqual(__version__, match.group(1))
+
     def test_parser_accepts_each_command(self):
         from actor.cli import build_parser, _split_command
 

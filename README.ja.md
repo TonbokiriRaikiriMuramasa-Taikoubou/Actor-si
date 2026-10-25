@@ -284,7 +284,7 @@ python3 -m actor rooms say "この図を見て" --attach ./図.png --reply   # �
 
 ## Portable Agent Skills / Agensi
 
-Agensi 向けエクスポートプロファイル、lint の制約、portable な `SKILL.md` の互換性は [docs/agensi.md](docs/ja/agensi.md) と [docs/skills-compat.md](docs/ja/skills-compat.md) を参照してください。Lint は保守的な近似であり、審査通過を保証しません。変更履歴は [CHANGELOG.md](CHANGELOG.md)、[v0.2.1 セキュリティ修正リリースノート](docs/ja/release-notes-v0.2.1.md)、[v0.2.0 リリースノート](docs/ja/release-notes-v0.2.0.md) を参照してください。
+Agensi 向けエクスポートプロファイル、lint の制約、portable な `SKILL.md` の互換性は [docs/agensi.md](docs/ja/agensi.md) と [docs/skills-compat.md](docs/ja/skills-compat.md) を参照してください。Lint は保守的な近似であり、審査通過を保証しません。変更履歴は [CHANGELOG.md](CHANGELOG.md)、[v0.3.0 リリースノート](docs/ja/release-notes-v0.3.0.md)、[v0.2.1 セキュリティ修正リリースノート](docs/ja/release-notes-v0.2.1.md)、[v0.2.0 リリースノート](docs/ja/release-notes-v0.2.0.md) を参照してください。
 
 ## ルームのトークン保護と Webhook
 
@@ -314,7 +314,7 @@ curl -s -X POST localhost:8080/api/rooms/actor-x/messages \
 
 ```
 $ python3 -m actor
-🎭 Actor-si v0.2.1 — SKILL.md 駆動の Gemini 対話クライアント
+🎭 Actor-si v0.3.0 — SKILL.md 駆動の Gemini 対話クライアント
 /help でコマンド一覧、/exit で終了。
 シミュレータで動作中 — GEMINI_API_KEY を設定すると本物の Gemini に切り替わります。
 スキル 5 件 / 保存先 /path/to/Actor-si/.actor
