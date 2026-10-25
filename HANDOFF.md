@@ -82,8 +82,8 @@ The default skill tests are format-only: they inspect output templates and asser
 
 ## Release and change constraints
 
-- PR #5 contains the merged security fixes. PR #6 added the English source edition and opt-in Japanese localization; PR #7 translated the CLI and UI chrome. All three are merged.
-- Release notes for `v0.2.1` are prepared in [`docs/release-notes-v0.2.1.md`](docs/release-notes-v0.2.1.md), but the tag and GitHub Release have not been created. Do not create them without explicit maintainer approval. Before publishing, confirm the release changes are on `main` and the tag/release does not already exist.
+- PR #5 contains the merged security fixes. PR #6 added the English source edition and opt-in Japanese localization; PR #7 translated the CLI and UI chrome; PR #8 addressed the lint, packaging, auth-header, and positioning review findings. All four are merged.
+- Release notes for `v0.2.1` are maintained in [`docs/release-notes-v0.2.1.md`](docs/release-notes-v0.2.1.md). Creating a release tag or GitHub Release requires explicit maintainer approval; before publishing, confirm the reviewed changes are on `main`, the project version is correct, and the tag/release does not already exist.
 - Preserve the published `v0.2.0` tag and release. Do not rewrite published history or force-push.
 - Do not modify `examples/mika` unless explicitly asked.
 - Keep Sponsors links in `FUNDING.md`; do not add them to `LISTING.md` or skill ZIPs.
