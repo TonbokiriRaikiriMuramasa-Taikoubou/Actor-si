@@ -1,81 +1,84 @@
-# Actor-si handoff
+# Actor-si maintainer handoff
 
 Last reviewed: 2026-10-25
 
 Repository: <https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si>
 
-This file describes the maintained implementation and operational checks. The Japanese documentation lives under [`docs/ja/`](docs/ja/), and the Japanese README is [`README.ja.md`](README.ja.md). The historical snapshot [`docs/development-handoff.md`](docs/development-handoff.md) is not current guidance.
+Use this file for maintained project guidance. The historical snapshot [`docs/development-handoff.md`](docs/development-handoff.md) is for context only; its test counts and implementation notes are not current.
 
-## Project overview
+## Language editions
 
-Actor-si is a local-first CLI, HTTP API, web UI, and resident bot that loads `SKILL.md` instructions and calls the Gemini API. Its core uses only the Python standard library; the Google SDK backend is optional. Without provider credentials, the built-in simulator supports offline checks.
+English is the default source edition. Japanese documentation and skills are maintained separately:
+
+| Content | English (default) | Japanese |
+|---|---|---|
+| User guide | [`README.md`](README.md) | [`README.ja.md`](README.ja.md) |
+| Documentation | [`docs/`](docs/) | [`docs/ja/`](docs/ja/) |
+| Skills | [`skills/`](skills/) | [`i18n/ja/skills/`](i18n/ja/skills/) |
+
+Japanese skills are opt-in with `--skills-dir i18n/ja/skills`. Keep the procedure and checklist order aligned between locales, and update each locale's output-format cases when its template changes. Skill headings are fixed by that edition's output contract; write the response body in the user's language.
+
+## Project and code map
+
+Actor-si is a local-first CLI, HTTP API, web UI, and resident bot that loads `SKILL.md` instructions and can call the Gemini API. The core uses only Python's standard library. The Google SDK backend is optional; the built-in simulator supports offline development.
 
 - CLI and packaging: `actor/cli.py`, `pyproject.toml`
 - HTTP API and browser UI: `actor/server.py`, `actor/web/`
-- Chat and providers: `actor/chat.py`, `actor/providers.py`
-- Skill loading and composition: `actor/skills.py`, `actor/prompt.py`
+- Chat and provider backends: `actor/chat.py`, `actor/providers.py`
+- Skill loading and prompt composition: `actor/skills.py`, `actor/prompt.py`
 - Portable ZIP lint and export: `actor/portable.py`
 - Output-format contract tests: `actor/skill_tests.py`
-- English default skills: `skills/` (brand-voice, code-review, minutes-writer, release-notes, skill-author)
-- Japanese skills: `i18n/ja/skills/` (opt in with `--skills-dir i18n/ja/skills`)
+- Shared English principles: `skills/_house/principles.md`
+- Shared Japanese principles: `i18n/ja/skills/_house/principles.md`
 
-See [`README.md`](README.md) for setup, [`docs/bot.md`](docs/bot.md) for resident bots, [`docs/keys.md`](docs/keys.md) for provider credentials and quota rotation, [`docs/skills-compat.md`](docs/skills-compat.md) for portability, and [`docs/agensi.md`](docs/agensi.md) for portable export.
+For task-specific details, see [`docs/bot.md`](docs/bot.md), [`docs/keys.md`](docs/keys.md), [`docs/skills-compat.md`](docs/skills-compat.md), and [`docs/agensi.md`](docs/agensi.md).
 
-## Development and validation
+## Development checks
 
 Run from the repository root:
 
 ```sh
-# Standard-library unit suite
+# Full standard-library test suite
 python -m unittest discover -s tests -q
 
-# Check output-format assertions for the default English skills
-python -m actor skills test
-
-# Lint and export portable skills
+# English default skills
 python -m actor skills lint --target agensi
+python -m actor skills test
 python -m actor skills export minutes-writer --target agensi -o /tmp/minutes-writer.zip
 
-# Check the Japanese skills explicitly
+# Japanese skills; pass the locale directory explicitly
 python -m actor skills --skills-dir i18n/ja/skills lint --target agensi
 python -m actor skills --skills-dir i18n/ja/skills test
+python -m actor skills --skills-dir i18n/ja/skills export minutes-writer --target agensi -o /tmp/minutes-writer-ja.zip
 
-# Run the local server and diagnostics
+# Environment diagnostics
 python -m actor doctor
-python -m actor serve --port 8080
 ```
 
-The format-only skill tests inspect templates and assertions; they do not call a model. `--live` sends prompts to the configured provider and may incur charges. The optional UI smoke test uses Node and `jsdom`; its token-protected CI job uses a randomly generated, ephemeral token.
+The default skill tests are format-only: they inspect output templates and assertions without calling a model. `--live` sends prompts to the configured provider and may incur charges. The optional UI smoke test requires Node and `jsdom`; its CI job uses a newly generated temporary room token. Do not check fixed tokens or provider credentials into source, test fixtures, logs, or documentation.
 
-## Security behavior
+## Security and operations
 
 - API `POST`, `PUT`, and `DELETE` mutations require `Content-Type: application/json`.
-- Mutating browser requests accept same-origin requests or origins explicitly listed in `ACTOR_CORS_ORIGINS`. Requests without an Origin header are permitted for non-browser clients, subject to JSON requirements and any configured token.
-- Tokens are accepted through `X-Actor-Token`, `X-Room-Token`, or `Authorization: Bearer`. Query-string tokens are not accepted.
+- Mutating browser requests accept same-origin requests or origins explicitly listed in `ACTOR_CORS_ORIGINS`. Requests without an `Origin` header are permitted for non-browser clients, subject to JSON requirements and any configured token.
+- Room tokens are accepted through `X-Actor-Token`, `X-Room-Token`, or `Authorization: Bearer`; query-string tokens are not accepted.
 - Content Security Policy restricts `frame-ancestors` to `'self'`. Set a room token before exposing the server beyond loopback, and configure host/origin allowlists for the deployment.
-- Do not put credentials, private account data, or personal email addresses in source, logs, fixtures, or documentation. Keep runtime data in ignored `.actor/` files and local secret stores.
+- Keep runtime data in ignored `.actor/` files or a local secret store. Do not commit credentials, private account data, or personal email addresses.
 
-## Portable Agent Skills
+## Portable skill packages
 
-- Export produces one skill per ZIP with `<name>/SKILL.md` at the package root.
+- Export one skill per ZIP with `<name>/SKILL.md` at the package root.
 - ZIPs are reproducible for identical inputs. HTML comments are removed from prose but preserved inside fenced and indented code examples.
-- Shared `principles.md` and the MIT `LICENSE` are required in source and in the packaged Python resources; tests verify the copies stay synchronized.
-- Lint checks the exact archive variant selected for export, including the `--keep-allowed-tools` option. Use the same option for lint and export.
-- Lint is a conservative approximation, not a safety guarantee or marketplace approval. Review the complete ZIP and any warnings manually.
+- `principles.md` and the MIT `LICENSE` are required in the source and packaged resources; tests verify the canonical and packaged copies stay synchronized.
+- Lint checks the same archive variant selected for export. If using `--keep-allowed-tools`, pass it to both lint and export.
+- Lint is a conservative approximation, not a safety guarantee or marketplace approval. Review the complete ZIP and warnings manually.
 - Binary references, hidden files, caches, tests, and dependencies are excluded. Actor does not submit skills or operate external accounts.
-
-## Skill output-format checks
-
-Each `skills/<name>/tests/cases.yaml` is JSON syntax compatible with YAML 1.2. The checker discovers the output-format section in either supported language. Angle-bracket text such as `<Meeting name>` in assertions matches a non-empty placeholder value.
-
-- `python -m actor skills test` checks the default English skill contracts.
-- `python -m actor skills --skills-dir i18n/ja/skills test` checks the Japanese copies.
-- When a template changes, update that locale's case file in the same change. Keep both sets of tests meaningful; do not weaken assertions to make a check pass.
 
 ## Release and change constraints
 
-- The security fixes from PR #5 are merged. The next prepared version is `v0.2.1`; its release notes are in [`docs/release-notes-v0.2.1.md`](docs/release-notes-v0.2.1.md). Check that the changes are on `main` and that the version tag/release does not already exist before publishing.
+- The security fixes from PR #5 are merged. PR #6 adds the English source edition and opt-in Japanese localization; it does not change the release version.
+- The next prepared version is `v0.2.1`; its release notes are in [`docs/release-notes-v0.2.1.md`](docs/release-notes-v0.2.1.md). Before publishing, confirm the changes are on `main` and the tag/release does not already exist.
 - Preserve the published `v0.2.0` tag and release. Do not rewrite published history or force-push.
 - Do not modify `examples/mika` unless explicitly asked.
-- `LISTING.md` has not been verified against live third-party hosts; do not claim host compatibility until tested.
-- GitHub repository About/Topics could not be changed due to an integration permission error; an authorized owner must update them manually if desired.
+- [`LISTING.md`](LISTING.md) is a draft and has not been verified against live third-party hosts. Do not claim host compatibility until tested.
+- Repository About/Topics could not be changed due to an integration permission error; an authorized owner would need to update them manually.
