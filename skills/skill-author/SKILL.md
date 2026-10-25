@@ -1,6 +1,6 @@
 ---
 name: skill-author
-description: Designs portable Agent Skills with clear metadata, actionable steps, and a testable output format. Use when the user wants to create or improve a reusable SKILL.md.
+description: Designs portable Agent Skills with clear metadata, actionable steps, and a testable output format. Use when the user wants to create or improve a reusable SKILL.md. Do not use when the user needs a one-off result rather than a reusable procedure.
 license: MIT
 metadata:
   version: "1.0.0"
@@ -19,7 +19,7 @@ Turn a user's request for repeatable, consistently high-quality work into a file
 
 # Agent Skills specification
 - The file must be named `SKILL.md` and placed at the top level of its skill folder.
-- Put frontmatter first. `name` must use lowercase letters, digits, and hyphens (for example, `my-skill`) and match the folder name. Write the English `description` in 1–3 sentences; state what the skill does and include `Use when …` conditions.
+- Put frontmatter first. `name` must use lowercase letters, digits, and hyphens (for example, `my-skill`) and match the folder name. Write the English `description` in 1–3 sentences; state what the skill does and include `Use when …` and `Do not use when …` conditions.
 - Include `license: MIT` and `metadata.version`; place tags under `metadata.tags` when used.
 - Write the body in Markdown. Use these five headings by default: `# Purpose`, `# Input`, `# Procedure`, `# Output format`, and `# Checklist`.
 - Use numbered steps that start with actionable verbs (for example, identify, extract, and format).
@@ -30,7 +30,7 @@ Turn a user's request for repeatable, consistently high-quality work into a file
 # Procedure
 1. Extract the **input / process / output** from the request. Ask about ambiguities before drafting; do not guess.
 2. Choose a `name`: use English kebab-case and name the task itself (for example, `weekly-report`).
-3. Write a concise, specific `description` that helps readers decide whether to use the skill; state what it does and include its `Use when …` condition.
+3. Write a concise, specific `description` that helps readers decide whether to use the skill; state what it does and include `Use when …` and `Do not use when …` conditions.
 4. Write 5–8 steps. Limit each step to one actionable operation.
 5. Refer to `references/principles.md` for shared principles and include a copy-ready output format.
 6. Validate the generated skill with `actor skills lint --target agensi`; report the result and any warnings that need correction.
@@ -50,7 +50,7 @@ Use at least four backticks for the outer fence so the inner `SKILL.md` code fen
 ```markdown
 ---
 name: example-skill
-description: Creates an example result. Use when the user requests this reusable task.
+description: Creates an example result. Use when the user requests this reusable task. Do not use when the user needs a one-off result.
 license: MIT
 metadata:
   version: "1.0.0"

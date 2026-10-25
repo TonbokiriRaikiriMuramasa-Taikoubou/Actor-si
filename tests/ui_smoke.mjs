@@ -89,6 +89,12 @@ check('チャット: トークン設定時に認証ヘッダーを送る',
       !AUTH_TOKEN || streamRequest?.headers.get('X-Actor-Token') === AUTH_TOKEN,
       AUTH_TOKEN ? (streamRequest?.headers.get('X-Actor-Token') ? 'header present' : 'header missing') : 'tokenless mode');
 
+await window.api('/api/health', { headers: { 'X-Actor-Smoke': 'custom' } });
+const customHeadersRequest = [...apiRequests].reverse().find((request) => request.path === '/api/health'
+  && request.headers.get('X-Actor-Smoke') === 'custom');
+check('api(): caller headers retain room-token authentication',
+      !!customHeadersRequest && (!AUTH_TOKEN || customHeadersRequest.headers.get('X-Actor-Token') === AUTH_TOKEN));
+
 const msgs = $$('#messages .msg');
 check('送信: ユーザー + アシスタントの2件', msgs.length === 2, `${msgs.length} 件`);
 const reply = msgs[1] ? msgs[1].querySelector('.content').textContent : '';

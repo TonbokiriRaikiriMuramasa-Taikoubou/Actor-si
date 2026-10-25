@@ -67,9 +67,10 @@ function authHeaders(extra = {}) {
 }
 
 async function api(path, options = {}) {
+  const { headers, ...fetchOptions } = options;
   const res = await fetch(path, {
-    headers: authHeaders(options.headers || {}),
-    ...options,
+    ...fetchOptions,
+    headers: authHeaders(headers || {}),
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
   const text = await res.text();

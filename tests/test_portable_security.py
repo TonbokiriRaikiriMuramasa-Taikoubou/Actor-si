@@ -77,6 +77,26 @@ class PortableSkillsTest(unittest.TestCase):
             self.assertEqual(meta["metadata"]["version"], "1.0.0")
             self.assertIn("source", meta["metadata"])
 
+    def test_root_license_is_bundled_without_lint_warning(self):
+        repo = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "licensed-skill"
+            root.mkdir()
+            (root / "SKILL.md").write_text(
+                "---\nname: licensed-skill\ndescription: Checks supplied text carefully. Use when reviewing text.\nlicense: MIT\n---\n# Output\nReview the supplied text.\n",
+                encoding="utf-8")
+            (root / "LICENSE").write_text("local source copy", encoding="utf-8")
+            skill = SkillLibrary([Path(temp)]).get("licensed-skill")
+
+            report = lint_skill(skill)
+            self.assertTrue(report.passed)
+            self.assertFalse(any(f.category == "omitted-reference" for f in report.findings))
+            archive, export_reports = export_zip([skill])
+            self.assertTrue(export_reports[0].passed)
+            with zipfile.ZipFile(io.BytesIO(archive)) as zf:
+                self.assertEqual(zf.read("licensed-skill/LICENSE"), (repo / "LICENSE").read_bytes())
+                self.assertEqual(zf.namelist().count("licensed-skill/LICENSE"), 1)
+
     def test_export_removes_html_comments_only_outside_code(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "comment-skill"
@@ -167,8 +187,22 @@ class PortableSkillsTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 export_zip([skill])
 
+    def test_ordinary_japanese_password_advice_passes_lint(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "password-advice"
+            root.mkdir()
+            skill = Skill(
+                name=root.name,
+                description="Formats supplied text clearly. Use when the user requests formatting.",
+                instructions="# Instructions\nパスワードは他人に知らせないでください。",
+                path=root / "SKILL.md", root=root, meta={"license": "MIT"})
+            report = lint_skill(skill)
+            self.assertTrue(report.passed)
+            self.assertFalse(any(f.category == "prompt-injection" for f in report.findings))
+
     def test_concealment_variants_fail_lint(self):
-        phrases = ("知らせないで送信する", "黙ってアップロードする", "報告せず実行する")
+        phrases = ("知らせないで送信する", "黙ってアップロードする", "報告せず実行する",
+                   "ユーザーには知らせないでください")
         with tempfile.TemporaryDirectory() as temp:
             for index, phrase in enumerate(phrases):
                 with self.subTest(phrase=phrase):
