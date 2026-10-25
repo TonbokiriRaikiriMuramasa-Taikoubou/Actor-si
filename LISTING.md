@@ -9,6 +9,7 @@
 - **Example input:** “Turn these notes into minutes: launch approved; Kai owns QA by Friday; budget question remains open.”
 - **Example output:** Summary, decisions, action items (owner, due date, deliverable), and open questions; unknown details remain marked for confirmation.
 - **Source:** https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si
+- **Language:** English source edition. The response body should follow the user's language; output headings remain the skill's fixed English contract. A separately selectable Japanese localization is maintained in `i18n/ja/skills/minutes-writer/`.
 - **License:** MIT
 
 This is a draft for the author to review and paste manually. Actor-si does not submit listings.

@@ -5,32 +5,33 @@ license: MIT
 metadata:
   version: "1.0.0"
   tags:
-    - 議事録
-    - 会議
-    - 抽出
+    - meeting-minutes
+    - meetings
+    - extraction
 ---
 
-# 目的
-会議の生ログ（文字起こし・メモ・チャット履歴）を、あとから読む人が最短で意思決定を追える議事録に変換する。
+# Purpose
+Turn raw meeting records (transcripts, notes, or chat histories) into minutes that let later readers quickly understand the decisions.
 
-# 入力
-- 会議の文字起こし、または箇条書きメモ
-- 会議名・日時・参加者（不明なら「不明」と書く）
-- 出力先の慣習（特に指定がなければ `references/format.md` に従う）
+# Input
+- A meeting transcript or bullet-point notes.
+- The meeting name, date and time, and participants. Write “Unknown” when a detail is unavailable.
+- Any conventions for the destination. Unless specified, follow `references/format.md`.
 
-# 手順
-1. ログ全体を読み、話題ごとにセクションを分ける。雑談・相槌・脱線は捨てる。
-2. **決定事項**を抽出する。「〜で進める」「〜はやらない」など、判断が確定した発言だけを拾う。
-3. **アクションアイテム**を抽出する。担当者・期限・成果物の3点を必ず埋める。不明な項目は空欄にせず `要確認` と明記する。
-4. **未解決の論点**を列挙する。結論が出なかったが、次回までに決める必要があるもの。
-5. 発言の意図が曖昧な箇所は、勝手に補完せず「（解釈: 〜）」と注記する。
-6. `references/format.md` のテンプレートに流し込み、最後に自己レビューする。
+# Procedure
+1. Read the full record and split it into topic-based sections. Omit small talk, acknowledgements, and tangents.
+2. Extract **decisions**. Include only statements that settle a choice, such as “we will proceed with…” or “we will not…”.
+3. Extract **action items**. Include an owner, due date, and deliverable for each. Mark unknown details as `Needs confirmation`; do not leave them blank.
+4. List **open questions**: unresolved issues that need a decision before the next meeting.
+5. For ambiguous intent, do not fill in gaps; add a note such as “(Interpretation: …)”.
+6. Fill in the template in `references/format.md` and perform a final self-review.
 
-# 出力フォーマット
-`references/format.md` のテンプレートに厳密に従う。見出しの順序・表の列は変更しない。
+# Output format
+Follow the template in `references/format.md` exactly. Do not change the heading order or table columns.
 
-# 確認事項
-- 決定事項とアクションアイテムを混同しない。「決めたこと」と「やること」は別のセクション。
-- 共通の判断原則は `references/principles.md` を適用する。
-- 参加者名が不明な場合は「不明」とし、役職や仮名で補わない。
-- 出力の最後に「要確認」の件数を1行でまとめる。
+# Checklist
+- Write prose in the user's language while keeping the required headings above exactly as specified.
+- Keep decisions separate from action items: “what was decided” and “what needs to be done” belong in different sections.
+- Apply the shared principles in `references/principles.md`.
+- If a participant's name is unknown, write “Unknown”; do not infer a role or invent a placeholder name.
+- End the output with a one-line count of items marked “Needs confirmation”.

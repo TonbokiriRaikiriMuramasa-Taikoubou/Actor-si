@@ -1,29 +1,29 @@
-# レビュー観点チェックリスト
+# Code review checklist
 
-## 1. 正しさ
-- [ ] 境界値（0件・1件・最大件・空文字・null）
-- [ ] 例外経路（失敗時にも状態が壊れないか）
-- [ ] 非同期処理の競合・順序保証
-- [ ] ループ内の再代入・参照共有（浅いコピー）
-- [ ] タイムゾーン・丸め・通貨・単位
+## 1. Correctness
+- [ ] Boundary values (zero items, one item, maximum size, empty string, null)
+- [ ] Exception paths (does a failure leave state corrupted?)
+- [ ] Concurrency and ordering guarantees in asynchronous work
+- [ ] Reassignment or shared references inside loops (shallow copies)
+- [ ] Time zones, rounding, currencies, and units
 
-## 2. セキュリティ
-- [ ] 外部入力がクエリ / シェル / HTML に素通しされていないか
-- [ ] 認可チェックが「入口だけでなく各操作」にあるか
-- [ ] 秘密情報の直書き・ログ出力
-- [ ] パス結合（`..` による脱出）
-- [ ] 依存追加の妥当性（既知の脆弱性・メンテ状況）
+## 2. Security
+- [ ] Is external input passed directly into a query, shell, or HTML context?
+- [ ] Are authorization checks applied at every operation, not just at entry points?
+- [ ] Are secrets hard-coded or written to logs?
+- [ ] Can path construction escape via `..`?
+- [ ] Are added dependencies justified, maintained, and free of known relevant vulnerabilities?
 
-## 3. リソース
-- [ ] ファイル / ソケット / コネクションのクローズ
-- [ ] N+1 アクセス、無限に伸びるキャッシュ
-- [ ] リトライ回数とバックオフ、無限リトライ
+## 3. Resources
+- [ ] Are files, sockets, and connections closed?
+- [ ] Are there N+1 accesses or unbounded caches?
+- [ ] Are retry counts and backoff bounded (no infinite retries)?
 
-## 4. 運用
-- [ ] 失敗時に原因が特定できるログが出るか
-- [ ] 設定値のデフォルトが本番で危険にならないか
-- [ ] 後方互換（API 変更・スキーマ変更・保存形式）
+## 4. Operations
+- [ ] Do failures produce logs that help identify the cause without exposing secrets?
+- [ ] Are defaults safe for production?
+- [ ] Is backward compatibility preserved (API, schema, and stored formats)?
 
-## 5. テスト
-- [ ] 変更した分岐にテストがあるか
-- [ ] テストが実装の写経になっていないか
+## 5. Tests
+- [ ] Are changed branches covered by tests?
+- [ ] Do tests verify behavior rather than duplicate the implementation?

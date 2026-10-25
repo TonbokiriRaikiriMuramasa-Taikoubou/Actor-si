@@ -1,15 +1,15 @@
 [
   {
     "name": "complete reusable skill template",
-    "input": "再利用可能な会議要約スキルを作成してください。Agent Skills形式で、出力形式と5つの基本見出しを含む完全なSKILL.mdを返してください。",
+    "input": "Create a reusable meeting-summary skill in the Agent Skills format. Include an output specification and a complete SKILL.md with the five standard headings.",
     "assert_contains": [
-      "## 設計メモ",
+      "## Design memo",
       "## SKILL.md",
-      "# 目的",
-      "# 入力",
-      "# 手順",
-      "# 出力フォーマット",
-      "# 確認事項"
+      "# Purpose",
+      "# Input",
+      "# Procedure",
+      "# Output format",
+      "# Checklist"
     ]
   }
 ]

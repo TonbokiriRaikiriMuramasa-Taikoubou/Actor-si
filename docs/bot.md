@@ -1,135 +1,114 @@
-# 常駐ボット運用ガイド
+# Always-on bot operations guide
 
-Actor は「自分だけのクライアント」と「常駐ボット」の両方を作れる。
-このドキュメントは **常駐ボット** 側の話。
+Actor can run as an interactive client or as an always-on bot. This guide covers the bot process.
 
+```text
+┌──────────────┐  poll for room updates  ┌────────────────────────────┐
+│  actor bot   │ ─────────────────────▶ │  actor serve               │
+│  local host  │ ◀───────────────────── │  /api/rooms/<name>         │
+│  SKILL.md    │   post a reply          │  (shared room log)          │
+│  + Gemini    │                         └────────────────────────────┘
+└──────────────┘                                      ▲
+                           people and apps post messages via HTTP
 ```
-┌──────────────┐   監視（ポーリング）   ┌────────────────────────────┐
-│  actor bot   │ ───────────────────▶  │  actor serve               │
-│  （自分のPC） │ ◀─────────────────── │  /api/rooms/<name>         │
-│  SKILL.md    │   返事を書き込む       │  （ルーム＝共有ログ）        │
-│  + Gemini    │                       └────────────────────────────┘
-└──────────────┘                                     ▲
-                                    人間は curl / ブラウザ / アプリから発言
-```
 
-ボットを動かすマシンにも **API キー**が必要です。いちばん簡単なのは
-`.env` に `GEMINI_API_KEY=...` を置く（`actor key set` でも同じ場所に保存できます）。
-どのキーが使われるかは `actor key show` / `actor doctor` で確認できます。
+The machine running the bot needs provider credentials. Store them locally in `.env`, through `actor key set`, or in your service manager; never paste a key value into a command or document. Use `actor key show` or `actor doctor` to inspect the active source. Resident bots may reach provider rate limits: configure multiple keys or fallback models and inspect state with `actor key list` / `actor key check`.
 
-常駐させるとレート制限（429）に当たりやすいので、**キーを複数持たせておく**のがおすすめです
-（`.env` に `GEMINI_API_KEYS=AIza...,AIza...` か `actor key add`）。429 になったキーは一時的に
-避けられ、自動で次のキーで返事をします。状態は `actor key list`、生死は `actor key check` で確認できます。
+A bot is a full Actor instance with local skills, sessions, and history. A room is only the shared meeting point, so bots with different skills or models can join the same room.
 
-それでも足りないときは **モデルごと逃がします**。Gemini の枠は「プロジェクト × モデル」単位なので、
-`ACTOR_MODEL=gemini-3.8-flash` のキーが全滅しても `ACTOR_MODEL_FALLBACKS`（既定
-`gemini-3.5-flash,gemini-2.5-flash`）のどれかで返事を続けます。ログには
-`🔁 gemini-3.8-flash で全キーが 429 → gemini-3.5-flash に逃がします` と出ます（黙って別モデルには
-しません）。逃げ道を使わせたくないときは `--no-model-fallback`。キーの増やし方は `actor key sources`。
-
-ボットは **Actor の完全なインスタンス**（スキル・セッション・履歴をローカルに持つ）として動き、
-ルームは「合流点」としてだけ使う。だから同じルームに複数のボット（別のスキル・別のモデル）を
-参加させることもできる。
-
-## 1. 最小構成（3ステップ）
+## 1. Minimal setup (three steps)
 
 ```bash
-# 1) サーバー（ルームを外から見えるようにする）
+# 1) Start the server
 python3 -m actor serve --port 8080
 
-# 2) 常駐ボット（ペルソナ「ミカ」を固定適用）
-python3 -m actor bot --room actor-x --skills mika --name ミカ \
-    --skills-dir skills --skills-dir examples/mika
+# 2) Start a resident bot with a persona skill
+python3 -m actor bot --room actor-x --skills mika --name Mika \
+  --skills-dir skills --skills-dir examples/mika
 
-# 3) 話しかける
+# 3) Post a message
 curl -s -X POST localhost:8080/api/rooms/actor-x/messages \
   -H 'Content-Type: application/json' \
-  -d '{"text":"おはよー","author":"TRMTKB"}'
+  -d '{"text":"Please summarize today’s tasks","author":"team-member"}'
 
-# 会話を見る
+# Inspect the conversation
 python3 -m actor rooms show actor-x
 ```
 
-サーバー側でその場で返事を生成したいだけなら、ボットなしでも動く（`reply: true`）:
+A one-off server-side response does not need a resident bot; add `reply: true`:
 
 ```bash
 curl -s -X POST localhost:8080/api/rooms/actor-x/messages \
   -H 'Content-Type: application/json' \
-  -d '{"text":"今日のタスクを整理して","reply":true}' | jq -r '.reply.text'
+  -d '{"text":"Organize today’s tasks","reply":true}' | jq -r '.reply.text'
 ```
 
-| | ボット（`actor bot`） | サーバー内蔵（`reply: true`） |
+| | Bot (`actor bot`) | Server-side (`reply: true`) |
 | --- | --- | --- |
-| スキル | ボットのローカルのもの | サーバーのもの |
-| モデル / temperature | ボットの設定 + スキルの上書き | 同左 |
-| 向いている用途 | 常時稼働・複数ルーム・スキルを編集しながら調整 | 単発の確認、他のアプリからの呼び出し |
+| Skills | Bot's local skills | Server's skills |
+| Model / temperature | Bot settings plus skill overrides | Same |
+| Best for | Persistent work, multiple rooms, and tuning skills | One-off checks and calls from other apps |
 
-ボットは **道具（function calling）** も使えます。使い方によって `now` / `read_file` を自分で呼び、
-`🛠 now({"timezone_name": "Asia/Tokyo"})` のようにログへ出ます（`actor tools` で一覧）。
+Bots can also use function-calling tools. For example, a bot may call `now` or `read_file`; the call is recorded in the log. Inspect enabled tools with `actor tools`.
 
 ```bash
-# 使わせる道具と範囲を決める（既定は読み取りのみ）
+# Restrict tools and their filesystem scope (read-only by default)
 ACTOR_TOOLS=now,read_file,list_files python3 -m actor bot --room actor-x --skills mika
-ACTOR_TOOLS_ROOT=~/workspace      # 読み書きできる範囲（サンドボックス）
-ACTOR_TOOLS_ALLOW_WRITE=false     # write_file を許可するときだけ true
-ACTOR_TOOLS_ALLOW_NETWORK=false   # http_get を許可するときだけ true
+ACTOR_TOOLS_ROOT=~/workspace
+ACTOR_TOOLS_ALLOW_WRITE=false
+ACTOR_TOOLS_ALLOW_NETWORK=false
 ```
 
-画像や PDF を投げるのも同じルーム API です（ボットが受け取って Gemini へ渡します）。
+Images and PDFs can be sent through the same room API:
 
 ```bash
-python3 -m actor rooms say "この図を見て" --attach ./図.png --reply
-curl -s -X POST localhost:8080/api/rooms/actor-x/messages \
-  -H 'Content-Type: application/json' \
-  -d '{"text":"この図を見て","author":"TRMTKB","attachments":[{"name":"図.png","mime_type":"image/png","data":"'"$(base64 -w0 図.png)"'"}]}'
+python3 -m actor rooms say "Review this diagram" --attach ./diagram.png --reply
 ```
 
-## 2. ボットのオプション
+## 2. Bot options
 
 ```bash
 python3 -m actor bot \
-  --room actor-x \                 # 監視するルーム
-  --api http://127.0.0.1:8080 \    # 接続先
-  --name ミカ \                    # ルーム上の表示名
-  --skills mika --skills brand-voice \  # 固定適用（複数可＝スタック）
-  --interval 1.5 \                 # ポーリング間隔（秒）
-  --mention @actor \               # この文字列を含む発言にだけ反応
-  --from-now \                     # 起動後の発言にだけ反応（履歴を読み飛ばす）
-  --stream \                       # 生成中のテキストを端末にも流す
-  --model gemini-3-pro \           # モデル指定
-  --thinking-budget 2048           # 思考させる
+  --room actor-x \                    # room to monitor
+  --api http://127.0.0.1:8080 \       # server URL
+  --name Mika \                       # display name in the room
+  --skills mika --skills brand-voice \ # pin one or more skills
+  --interval 1.5 \                    # polling interval in seconds
+  --mention @actor \                  # respond only when this text is present
+  --from-now \                        # ignore messages posted before startup
+  --stream \                          # also stream generated text to the terminal
+  --model gemini-3-pro \              # choose a model
+  --thinking-budget 2048               # enable a thinking budget
 ```
 
-- `--no-auto` で自動選択を切り、固定したスキルだけで答える（ペルソナの揺れを抑えたいとき）
-- `--once` で 1 回だけ処理して終了。cron / タスクスケジューラ向け
-- カーソル（どこまで読んだか）は `.actor/bot-<room>.json` に保存され、再起動しても続きから
+- `--no-auto` disables automatic skill selection and uses only pinned skills.
+- `--once` handles one update and exits; use it with cron or Task Scheduler.
+- The read cursor is saved to `.actor/bot-<room>.json` and resumes after restart.
 
-### 再起動しても会話が続く
+### Conversation continuity after restart
 
-ボットの返事は `--room` ごとのセッション（`.actor/sessions/*.json`）に紐づく。
-プロセスを止めて再開しても、同じルームなら会話の文脈が維持される。
+A bot's replies are associated with a session for its room under `.actor/sessions/*.json`. Restarting the process preserves context for the same room.
 
-## 3. SKILL.md を編集しながら育てる
+## 3. Edit `SKILL.md` while the bot is running
 
-ボットは **ターンごとに SKILL.md を読み直す**。動かしたまま
+The bot reloads its skill files on every turn. Edit the skill while the process is running:
 
 ```bash
-$EDITOR examples/mika/SKILL.md     # 口調や禁止事項を書き換える
+$EDITOR examples/mika/SKILL.md
 ```
 
-とすれば、次の返事から反映される。ペルソナや手順の試行錯誤はこのループが一番速い。
-`/use` 相当の切り替えは `--skills` を変えて再起動、または同じルームに別名でボットを追加。
+Changes apply to the next reply. This is the fastest way to tune a persona or procedure. Change pinned skills by restarting with different `--skills`, or add another named bot to the same room.
 
-## 4. 動かし方いろいろ
+## 4. Ways to run the bot
 
-### 端末で常駐（いちばん簡単）
+### Keep it running in a terminal (simplest)
 
 ```bash
 python3 -m actor bot --room actor-x --skills mika
-# Ctrl-C で停止
+# Press Ctrl-C to stop
 ```
 
-### nohup / バックグラウンド
+### Use `nohup` or the background
 
 ```bash
 nohup python3 -m actor bot --room actor-x --skills mika \
@@ -137,7 +116,7 @@ nohup python3 -m actor bot --room actor-x --skills mika \
 tail -f .actor/bot.log
 ```
 
-### systemd（Linux）
+### Use systemd (Linux)
 
 ```ini
 # ~/.config/systemd/user/actor-bot.service
@@ -163,74 +142,72 @@ systemctl --user enable --now actor-bot
 journalctl --user -u actor-bot -f
 ```
 
-### cron（`--once` を定期実行）
+### Use cron with `--once`
 
-```
-*/5 * * * * cd $HOME/Actor && /usr/bin/python3 -m actor bot --room actor-x --skills mika --once >> .actor/cron.log 2>&1
+```cron
+*/5 * * * * cd "$HOME/Actor" && /usr/bin/python3 -m actor bot --room actor-x --skills mika --once >> .actor/cron.log 2>&1
 ```
 
-### Windows（タスクスケジューラ）
+### Use Windows Task Scheduler
 
 ```powershell
 schtasks /create /tn "ActorBot" /sc minute /mo 5 /tr ^
  "cmd /c cd %USERPROFILE%\Actor && python -m actor bot --room actor-x --skills mika --once"
 ```
 
-## 5. 複数ボット・複数ルーム
+## 5. Multiple bots and rooms
 
 ```bash
-# 同じルームに別の人格を参加させる（メンションで呼び分け）
-python3 -m actor bot --room team --name ミカ  --skills mika         --mention @mika
-python3 -m actor bot --room team --name レビ --skills code-review   --mention @review
+# Two personas in one room; use mentions to route requests
+python3 -m actor bot --room team --name Mika --skills mika --mention @mika
+python3 -m actor bot --room team --name Reviewer --skills code-review --mention @review
 
-# 別のルームで、用途別に
-python3 -m actor bot --room work   --skills minutes-writer --api http://127.0.0.1:8080
-python3 -m actor bot --room devlog --skills release-notes  --interval 5
+# Separate rooms for separate tasks
+python3 -m actor bot --room work --skills minutes-writer --api http://127.0.0.1:8080
+python3 -m actor bot --room devlog --skills release-notes --interval 5
 ```
 
-同じルームに複数ボットがいる場合、`--mention` で呼び分けるのが安全
-（付けないと全員が同じ発言に反応する）。
+When multiple bots share a room, use `--mention` to route a message; without it, every bot may respond to the same message.
 
-## 6. API リファレンス
+## 6. API reference
 
-| メソッド | パス | 説明 |
+| Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/rooms` | ルーム一覧 |
-| POST | `/api/rooms` | `{name, skills}` で作成（既存なら作成せず返す） |
-| GET | `/api/rooms/<name>?after=<seq>&limit=<n>` | 差分取得（`cursor` = 最新 seq / `attachments=1` で base64 も） |
-| POST | `/api/rooms/<name>/messages` | `{text, author, role, skills, reply, attachments, tools}` を追記 |
-| DELETE | `/api/rooms/<name>` | ルーム削除 |
+| GET | `/api/rooms` | List rooms |
+| POST | `/api/rooms` | Create a room with `{name, skills}`; returns an existing room if present |
+| GET | `/api/rooms/<name>?after=<seq>&limit=<n>` | Read updates; `cursor` reports the latest sequence; `attachments=1` includes attachment data |
+| POST | `/api/rooms/<name>/messages` | Append `{text, author, role, skills, reply, attachments, tools}` |
+| DELETE | `/api/rooms/<name>` | Delete a room |
 
-`ACTOR_ROOM_TOKEN` を設定すると、ルームだけでなく**すべての `/api/*` エンドポイント**に
-`X-Actor-Token: <token>` / `Authorization: Bearer <token>` が必要です。ボット側は
-`--token <文字列>` か `ACTOR_ROOM_TOKEN` を使います。外部 bind はトークン必須で、既定の bind は `127.0.0.1` です。
+When `ACTOR_ROOM_TOKEN` is set, **every `/api/*` endpoint** requires `X-Actor-Token` or `Authorization: Bearer`. The bot can read the token from its environment; avoid placing a token literal in arguments, logs, or documentation. External binding requires a token; the default bind address is `127.0.0.1`.
 
-`reply: true` を付けると、サーバー側でモデルを呼んで `reply` を一緒に返す。
-レスポンスの `missing_skills` に、サーバーが見つけられなかったスキル名が入る
-（`--skills-dir` の指定漏れに気づける）。
+With `reply: true`, the server calls its configured model and includes `reply` in the response. The response's `missing_skills` field lists skills that the server could not find, which helps detect a missing `--skills-dir`.
 
-## 6.5 トークン保護と Webhook
+## 6.5 Token protection and webhooks
+
+Generate tokens locally and store them in an environment or secret manager. Keep the room token and webhook signing secret separate.
 
 ```bash
-# 端末1: サーバー（トークンで保護し、発言を Webhook へ流す）
-export ACTOR_ROOM_TOKEN='replace-with-a-long-random-token' # 全APIに必要
-export ACTOR_WEBHOOK_URL='https://example.com/actor-hook'
-export ACTOR_WEBHOOK_SECRET='change-me'
+# Terminal 1: protect the server and enable webhook delivery
+export ACTOR_ROOM_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+export ACTOR_WEBHOOK_URL="https://example.com/actor-hook"
+export ACTOR_WEBHOOK_SECRET="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
 python3 -m actor serve --port 8080
 
-# 端末2: ボットも同じトークンで接続
-python3 -m actor bot --room actor-x --skills mika --api http://127.0.0.1:8080 --token 'hireme-please-change'
+# Terminal 2: load the same value from your local secret store into ACTOR_ROOM_TOKEN,
+# then run the bot (it reads the token from its environment).
+python3 -m actor bot --room actor-x --skills mika --api http://127.0.0.1:8080
 ```
 
-届く JSON（`Content-Type: application/json`）:
+Webhook payloads use `Content-Type: application/json`:
 
 ```json
-{"event": "message", "ts": "2026-10-13T09:00:00+0900", "room": "actor-x",
- "message": {"seq": 3, "role": "user", "text": "おはよー", "author": "TRMTKB"},
- "reply": null, "count": 3}
+{"event":"message","ts":"2026-10-13T09:00:00+0900","room":"actor-x",
+ "message":{"seq":3,"role":"user","text":"Please summarize this","author":"team-member"},
+ "reply":null,"count":3}
 ```
 
-受け側での署名検証（Node の例）:
+Verify the signature on the receiving side (Node.js example):
 
 ```js
 const crypto = require('crypto');
@@ -239,29 +216,27 @@ const expected = 'sha256=' + crypto.createHmac('sha256', process.env.ACTOR_WEBHO
 if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(req.headers['x-actor-signature']))) return res.status(401).end();
 ```
 
-- 通知は非同期。送れなくても会話は止まらず、5xx / 429 は最大3回リトライします
-- 世代（モデル）も同じ。429 が続けば `ACTOR_MODEL_FALLBACKS` の順に逃げるので、
-  常駐ボットが「枠切れで黙る」ことはほぼなくなります（`--no-model-fallback` で無効化）
-- 送信状況は `GET /api/health` の `webhook_stats`（queued / sent / failed / skipped）で確認できます
-- 通知を Slack などへ中継する場合は、受け側で `message.text` をそのまま転送するのが簡単です
+- Delivery is asynchronous. A delivery failure does not stop the conversation; 5xx and 429 responses are retried up to three times.
+- Model fallback works for bots as well: when rate limits persist, Actor tries models in `ACTOR_MODEL_FALLBACKS` order. Use `--no-model-fallback` to disable it.
+- Inspect `queued`, `sent`, `failed`, and `skipped` counters in `GET /api/health` under `webhook_stats`.
+- To relay messages to another service, forward `message.text` only after applying the receiving service's own validation and safety rules.
 
-## 7. つまずきやすいところ
+## 7. Common issues
 
-| 症状 | 原因と対処 |
+| Symptom | Cause and resolution |
 | --- | --- |
-| ボットが無反応 | サーバーが起動しているか（`curl localhost:8080/api/health`）。別マシンなら `--api` を向ける |
-| ペルソナが効かない | スキルが見つかっていない。起動ログの「警告: スキルが見つかりません」と `missing_skills` を確認、`--skills-dir` を追加 |
-| 過去の会話に全部返事してしまう | `--from-now` を付ける（または `.actor/bot-<room>.json` の cursor を調整） |
-| サーバーに繋がらない | `serve` の `--host`（既定 127.0.0.1）とポート、`--api` の URL を確認。外部 bind はトークン必須 |
-| 同じ返事が二度出る | 同じルームに同じボットを二重起動していないか（`.actor/bot-<room>.json` は共有される） |
-| 応答が遅い | `--stream` で進捗が見える。`--model` を flash 系にする、`--interval` を短くする |
+| Bot does not respond | Check that the server is running (`curl localhost:8080/api/health`). For a remote server, set `--api`. |
+| Persona has no effect | The skill may not be loaded. Check startup warnings and `missing_skills`; add the required `--skills-dir`. |
+| Bot replies to old messages | Add `--from-now` or adjust the cursor in `.actor/bot-<room>.json`. |
+| Cannot connect to server | Check the `serve` host/port and the bot's `--api` URL. External binding requires a token. |
+| Duplicate replies | Make sure the same bot is not running twice for one room; processes share `.actor/bot-<room>.json`. |
+| Slow response | Use `--stream` to see progress, choose a Flash model, or reduce `--interval`. |
 
-## 8. セキュリティ
+## 8. Security
 
-- 既定は `127.0.0.1`。非ループバックへ bind するには `ACTOR_ROOM_TOKEN` が必須で、設定時は全APIを保護する。
-- CORS は既定無効。別 Origin が必要なら `ACTOR_CORS_ORIGINS` を設定し、LAN の Host 名/IP は `ACTOR_ALLOWED_HOSTS` に追加する。
-- 外部公開時は、必要なら信頼できる TLS リバースプロキシを使う。
-- 道具は既定で読み取り専用。`write_file` / `http_get` は `ACTOR_TOOLS_ALLOW_*` を true にしたときだけ有効で、
-  パスは `ACTOR_TOOLS_ROOT` の中に閉じ込められる（`../` や絶対パスは拒否）
-- ルームのログとセッションは `.actor/` に平文で保存される（`.gitignore` 済み）
-- スキルの本文・参照資料は毎ターン API へ送られる（機密を入れない）
+- The default bind is `127.0.0.1`. Binding to a non-loopback address requires `ACTOR_ROOM_TOKEN`, which protects every API endpoint.
+- CORS is disabled by default. Set `ACTOR_CORS_ORIGINS` only when a trusted cross-origin browser client is needed; add LAN hostnames or IPs to `ACTOR_ALLOWED_HOSTS`.
+- If the service is exposed externally, use a trusted TLS-terminating reverse proxy where appropriate.
+- Tools are read-only by default. `write_file` and `http_get` require explicit `ACTOR_TOOLS_ALLOW_*` settings; filesystem access is confined to `ACTOR_TOOLS_ROOT`.
+- Room logs and sessions are stored as plaintext JSON under `.actor/` (ignored by Git).
+- Skill bodies and references are sent to the model API on each applicable turn; do not put confidential material in them.

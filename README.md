@@ -2,567 +2,413 @@
 
 [![Tests](https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si/actions/workflows/tests.yml/badge.svg)](https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si/actions/workflows/tests.yml)
 
-**Actor is a local-first Gemini client that loads `SKILL.md` folders as system instructions.** It includes a command-line interface, HTTP API, and web UI, and runs on Python's standard library without mandatory dependencies. Skills can be selected automatically, composed with references, and tested before use. The server binds to loopback by default; external binding requires an API token, and browser access is disabled unless explicitly allowed by a CORS origin list.
+Actor is a local-first Gemini client that loads `SKILL.md` folders as system instructions. It provides a CLI, HTTP API, and web UI, using Python's standard library for its core features. Skills can be selected automatically, composed with references, and checked before use. The server binds to loopback by default; external binding requires an API token, and browser cross-origin access requires an explicit allowlist.
 
-## 日本語
+## Overview
 
-**SKILL.md を `system_instruction` として読み込み、Gemini API と対話するクライアント。**
-CLI・HTTP API・Web UI（Gemini 風の `/` 呼び出し UI）の3つを、**Python 標準ライブラリだけで**提供します。
+Actor loads folders that follow the open, Markdown-native Agent Skills `SKILL.md` format and can:
 
-Google が Gemini に導入した「スキル」は、Markdown ネイティブなオープン標準 **SKILL.md** を採用しています。
-Actor はその形式のフォルダをそのまま読み込み、
+- Stack multiple skills into one `system_instruction`.
+- Select skills deterministically from a request, with a configurable threshold.
+- Include text references, templates, checklists, images, and PDFs with a skill.
+- Let the model call tools such as `now`, `read_file`, and `list_files`; a skill can narrow tools with `allowed-tools`.
+- Accept image and PDF attachments through the CLI, web UI, or HTTP API.
+- Protect rooms and API endpoints with a token and optionally forward room events to a webhook.
+- Draft new skills in a conversation and export them as ZIP files.
 
-- スキルを **複数スタック**して1つの `system_instruction` に合成
-- 依頼文からスキルを **自動選択**（決定的なスコアリング・閾値つき）
-- 参照ファイル（テンプレート・チェックリスト・PDF・画像）も `system_instruction` に同梱
-- モデルが自分で道具を使う **function calling**（`now` / `read_file` …。スキルの `allowed-tools` で絞れる）
-- **画像・PDF を貼って質問**できる（CLI `--attach` / Web UI 📎 / HTTP の `attachments`）
-- ルームは **トークンで保護**でき、発言を **Webhook** で外部へ通知できる
-- 会話から **新しい SKILL.md を生成**し、Gemini にアップロードできる ZIP で書き出し
-
-という流れを、ローカルで完結させます。
-
-```
-┌────────────┐   /skills/<name>/SKILL.md    ┌──────────────┐
-│  CLI       │──┐                           │ system_      │
-│  Web UI    │──┼──▶ Actor (SkillEngine) ──▶│ instruction  │──▶ Gemini API
-│  HTTP API  │──┘     選択・合成・保存      │ (+ 参照資料) │
-└────────────┘                              └──────────────┘
+```text
+┌────────────┐   /skills/<name>/SKILL.md   ┌──────────────┐
+│ CLI        │──┐                          │ system_      │
+│ Web UI     │──┼──▶ Actor (SkillEngine) ─▶│ instruction  │──▶ Gemini API
+│ HTTP API   │──┘     select / compose     │ + references │
+└────────────┘                             └──────────────┘
 ```
 
----
-
-## 30秒で試す
+## 30-second quickstart
 
 ```bash
 git clone https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si.git
 cd Actor-si
-
-# 依存インストール不要（Python 3.9+ があれば動きます）
-python3 -m actor "会議の文字起こしから議事録を作って"
+python3 -m actor "Create minutes from this meeting transcript"
 ```
 
-> **API キーの置き場所**（詳細はすぐ下）: リポジトリ直下の **`.env`** が基本。
-> `cp .env.example .env` して `GEMINI_API_KEY=AIza...` を書くか、Web UI 左下の **🔑** /
-> `python3 -m actor key set` でも同じです（保存先 `.actor/api_key`・gitignore 済み）。
+Python 3.9 or newer is sufficient for the standard-library core; installing the package is not required to run it from the repository. Without an API key, the built-in simulator exercises the same skill-selection, composition, streaming, and UI paths without calling Gemini.
 
-API キーが無くても **内蔵シミュレータ**が動きます（スキルの選択・合成・ストリーミング・UI はすべて本番と同じ経路）。
+### Where to set an API key (four options)
 
-### API キーはどこに入れる？（4つの置き場所）
+The repository-root `.env` file is the recommended location. You can also save a key through the web UI or `actor key set`; all local key files are ignored by Git.
 
-いちばん分かりやすいのは **リポジトリ直下の `.env`**（1ファイル・gitignore 済み）です。
-ファイルを触りたくない場合は、**Web UI の左下 🔑** か **`actor key set`** でも同じ場所に保存できます。
-
-```bash
-# ① .env に書く（いちばん明示的・推奨）
-echo 'GEMINI_API_KEY=AIza...（Google AI Studio で発行）' >> .env
-
-# ② UI から入れる: serve して左下の 🔑 →「保存して接続」（.actor/api_key に保存）
-python3 -m actor serve --port 8080
-
-# ③ CLI から入れる: 入力は画面に出ません（.actor/api_key に保存）
-python3 -m actor key set --check
-
-# ④ 複数キー（プレビュー版モデルの 429 対策）: 何本でも足せる
-python3 -m actor key add --check         # .actor/keys/key-1.key … に 1 本ずつ保存
-python3 -m actor key add --env           # .env の GEMINI_API_KEYS に追記する（コメントは保つ）
-# もしくは環境変数 / .env でまとめて:  GEMINI_API_KEYS=AIza...,AIza...,AIza...
-```
-
-| 置き場所 | パス | 備考 |
+| Source | Path / setting | Notes |
 | --- | --- | --- |
-| `.env` | `<リポジトリ>/.env` | **最優先**。`GEMINI_API_KEY=` でも `GEMINI_API_KEYS=`（複数）でも |
-| 環境変数 | `GEMINI_API_KEY` / `GEMINI_API_KEYS` | CI や systemd 向け（カンマ・空白・`;` 区切り） |
-| 保存ファイル | `.actor/api_key` | UI / `actor key set` が保存（chmod 600・gitignore 済み） |
-| keys ディレクトリ | `.actor/keys/key-*.key` | `actor key add` が保存（1 本 1 ファイル・chmod 600） |
+| `.env` | `<repository>/.env` | Supports `GEMINI_API_KEY` or `GEMINI_API_KEYS`. |
+| Environment | `GEMINI_API_KEY` / `GEMINI_API_KEYS` | Useful for CI and service managers; multiple values may be comma-, space-, or semicolon-separated. |
+| Saved key | `.actor/api_key` | Written by the UI or `actor key set`; file permissions are restricted where supported. |
+| Key directory | `.actor/keys/key-*.key` | Written by `actor key add`, one key per file. |
 
-優先度は **`--api-key` > 環境変数 > `.env` > `.actor/api_key` > `.actor/keys/`**。確認と後片付け:
+Copy `.env.example` to `.env`, then add your key locally without pasting it into commands, documentation, or source control. The precedence is **`--api-key` > environment > `.env` > `.actor/api_key` > `.actor/keys/`**.
 
 ```console
 $ python3 -m actor key show
-AIzaSy…7f3k （/home/user/Actor/.actor/api_key）
-プロバイダ: gemini / モデル: gemini-3-flash / キー 2 本（2/2 本が使用可能）
+API key: [masked]
+Provider: gemini / Model: gemini-3-flash / Available keys: 2 of 2
 
-$ python3 -m actor key list                 # 全部のキーと状態（429 の残り時間つき）
-API キー 2 本 （1/2 本が使用可能）
-  *[0] AIzaSy…7f3k              使用中 .actor/api_key
-   [1] AIzaSy…9x2p              429 制限中（あと 42 秒） .actor/keys/key-1.key
+$ python3 -m actor key list
+API keys: 2 (1 available)
+  [0] [masked]  active
+  [1] [masked]  cooling down
 
-$ python3 -m actor key check                # 1 本ずつ接続確認（--json も可）
-$ python3 -m actor key stats                # 429 でよく切れるキーを見る（--json / --reset 可）
-$ python3 -m actor key rm 1                 # その番号のキーだけ消す（.env の行からも消せる）
-$ python3 -m actor key clear                # 保存したキーを消す（.env はそのまま）
-```
-
-キーはサーバーから外へ出ません（`/api/config`・`/api/key` は伏せ字・本数・統計だけ）。
-Web UI の 🔑 にも「N キー（空き M）/ 429 で K 回切替」が出ます。`ACTOR_ROOM_TOKEN` を設定すると、キー変更だけでなく全 `/api/*` リクエストに同じトークンが必要です。
-
-> 接続確認（🔑 の「保存して接続」/ `actor key set --check`）で API に届かない場合は、
-> **キーは保存したままシミュレータで動き続けます**（会話が壊れないように、その場では切り替えません）。
-> ネットワークが使える環境で `actor key show` を見れば、次回起動から実モデルになります。
-
-### 429（Quota exceeded）が続くときは
-
-プレビュー版のモデルは無料枠だと `429 ResourceExhausted / Quota exceeded` がよく出ます。
-Actor は **キー → モデル** の順に逃げ道を用意しています（どちらも自動・必ず表示されます）。
-
-**① まずキーを替える。** 複数のキーを持たせておけば、その回のリクエストを次のキーへ回します。
-
-- 429 / 401 / 403 を受けたキーは `ACTOR_KEY_COOLDOWN`（既定 60 秒）だけ「使用中」から外れます
-  （待ち時間は 429 の `RetryInfo.retryDelay` があればそちらを優先）
-- 全部のキーが制限中になったら、**どのキーが何秒後に復帰するか**を書いたエラーで止まります（嘘の応答は返しません）
-- どのキーがよく切れるかは `actor key stats`（`uses` / `errors` / 429 の回数）。1 本だけ極端に切れるなら、
-  そのキーが Gemini アプリや他のツールと共有されていないか疑ってください
-- ログ・エラー・状態ファイルには **キー本体を出しません**（伏せ字と指紋だけ）
-- 切り替えが不要なら `ACTOR_KEY_ROTATE=false`（従来どおり同じキーでリトライのみ）
-
-```console
+$ python3 -m actor key check
 $ python3 -m actor key stats
-API キーの利用統計 （.actor/key_state.json）
-  通算: リクエスト 120 回 / 429 で切れた 14 回 / 切り替え 14 回
-  モデル別
-    gemini-3.8-flash     429 12 回 / リクエスト 40 回 / いま 1/2 本が使用可
-    gemini-3.5-flash     429 2 回 / リクエスト 80 回 / いま 2/2 本が使用可
-  429 でよく切れる順
-  [0] AIzaSy…7f3k              429 12 回 / 試行 40 回（30%） 使用中 [gemini-3.8-flash 12]
-よく切れているキー: [0] AIzaSy…7f3k（429 12 回 / 試行 40 回）
-いちばん切れているモデル: gemini-3.8-flash（429 12 回）
+$ python3 -m actor key rm 1
+$ python3 -m actor key clear
 ```
 
-**② それでも切れるなら別モデルへ逃がす。** 枠は「プロジェクト × モデル」単位なので、
-`gemini-3.8-flash` が切れていても `gemini-2.5-flash` なら通ります。主モデルのキーが全部 429 になったら、
-逃げ道のモデルで自動的に再試行します（既定: `gemini-3.5-flash` → `gemini-2.5-flash`）。
+The server never returns raw keys: `/api/config` and `/api/key` expose only masked values, counts, status, and statistics. If a connectivity check fails, a saved key remains in place and Actor continues in simulator mode; a later restart can use the real provider once connectivity is available.
 
-```console
-$ python3 -m actor "議事録を作って"
-🔁 gemini-3.8-flash で全キーが 429 → gemini-3.5-flash に逃がします
-（以下、gemini-3.5-flash の応答）
-```
+### When you hit 429 (quota exceeded)
 
-- 逃げたことは必ず表示されます（`🔁` / `--json` の `notices` / Web UI の本文）。黙って別モデルにはしません
-- 主モデルが制限中と分かっているターンは最初から逃げ道で試します（無駄な 429 を送らない）
-  → `ACTOR_MODEL_FALLBACKS=...` で逃げ道を決める / `--no-model-fallback` で逃げない
+Preview models can return `429 RESOURCE_EXHAUSTED / Quota exceeded`. Actor can rotate through configured keys and, if all keys are limited for the requested model, retry with configured fallback models.
 
-**③ 利用可能な認証先を確認する。** `actor key sources` に公式の利用先をまとめています。キーを作り直しても、同じプロジェクト・モデルの割り当てが増えるわけではありません。
+1. **Rotate keys.** A key that receives 429, 401, or 403 is cooled down for `ACTOR_KEY_COOLDOWN` seconds (default: 60; a longer server retry delay takes precedence). Actor reports when every key is limited instead of inventing a response. Use `actor key stats` to inspect counts; raw keys are not written to logs or state files.
+2. **Use a fallback model.** The quota is scoped by project and model. `ACTOR_MODEL_FALLBACKS` defaults to `gemini-3.5-flash,gemini-2.5-flash`. Actor announces a switch; use `--no-model-fallback` to disable it for one run.
+3. **Review your provider and quota.** `actor key sources` lists official access options. Creating another key in the same project does not increase that project's quota. Do not use multiple accounts to evade provider limits, and do not send sensitive data to a free-tier service unless its data terms are acceptable.
 
-```console
-$ python3 -m actor key sources
-  Google AI Studio [無料枠]              https://aistudio.google.com/apikey
-  Vertex AI エクスプレスモード [90 日無料]  https://console.cloud.google.com/expressmode
-  Google Cloud 無料トライアル [クレジット]  …
-```
+For Vertex AI Express Mode, set `ACTOR_BASE_URL` to `https://aiplatform.googleapis.com`; Actor selects the corresponding API version and model path. See [API key management](docs/keys.md) for configuration details.
 
-- **Vertex AI エクスプレスモード**（新規 Cloud ユーザー・90 日無料・課金設定なし）は API キーで使える別枠です。
-  `ACTOR_BASE_URL=https://aiplatform.googleapis.com` を設定すれば Actor が API の形（`v1` /
-  `publishers/google/models/{model}`）を自動で合わせます
-- ⚠️ 複数アカウントで制限を回避するのは規約違反です。無料枠では送信内容が製品改善に使われ得るため、
-  機密は送らないでください（詳しくは [docs/keys.md](docs/keys.md)）
-
-| やりたいこと | コマンド |
+| Task | Command |
 | --- | --- |
-| 対話する（CLI） | `python3 -m actor` |
-| Web UI / API を起動 | `python3 -m actor serve --port 8080` |
-| 1回だけ実行 | `python3 -m actor "差分をレビューして"` |
-| 結果を JSON で受け取る | `python3 -m actor --json "議事録を作って"` |
-| スキル一覧 | `python3 -m actor skills list` |
-| 使える道具の一覧 | `python3 -m actor tools` |
-| 画像を添えて質問 | `python3 -m actor --attach ./図.png "この図を説明して"` |
-| API キーの保存 | `python3 -m actor key set --check` |
-| キーの一覧 / 追加 / 確認 / 統計 | `python3 -m actor key list` / `key add` / `key check` / `key stats` / `key sources` |
-| 環境チェック | `python3 -m actor doctor --check-api` |
+| Start an interactive CLI session | `python3 -m actor` |
+| Start the web UI and HTTP API | `python3 -m actor serve --port 8080` |
+| Run one request | `python3 -m actor "Review this diff"` |
+| Return JSON | `python3 -m actor --json "Summarize this meeting"` |
+| List skills | `python3 -m actor skills list` |
+| List tools | `python3 -m actor tools` |
+| Attach a file | `python3 -m actor --attach ./diagram.png "Explain this diagram"` |
+| Check configuration | `python3 -m actor doctor --check-api` |
 
-`pip install -e .` すると `actor` コマンドとしても使えます（`actor serve` など）。
+Run `pip install -e .` if you want the `actor` console command.
 
----
+## Always-on bot
 
-## 常駐ボット（自分だけのクライアント）
-
-「決まった人格・決まった手順で、ずっとそこに居るボット」を作れます。
+An always-on bot is a full Actor instance with its own local skills, model settings, and session history. A room is the shared log where people and bots meet.
 
 ```bash
-# 端末1: サーバー
+# Terminal 1: start the room server
 python3 -m actor serve --port 8080
 
-# 端末2: ペルソナ「ミカ」を固定適用した常駐ボット
-python3 -m actor bot --room actor-x --skills mika --name ミカ \
-    --skills-dir skills --skills-dir examples/mika --from-now
+# Terminal 2: start a bot with a persona skill
+python3 -m actor bot --room team --skills mika --name Mika \
+  --skills-dir skills --skills-dir examples/mika --from-now
 
-# 端末3: 話しかける（どんなアプリからでも・HTTP 1本）
-curl -s -X POST localhost:8080/api/rooms/actor-x/messages \
-  -H 'Content-Type: application/json' -d '{"text":"おはよー","author":"TRMTKB"}'
-
-# 会話を眺める
-python3 -m actor rooms show actor-x
-```
-
-- ボットは **Actor の完全なインスタンス**（スキル・会話履歴・モデル設定をローカルに持つ）。ルームは合流点
-- **SKILL.md を編集すると次のターンから反映**される（動かしたままペルソナを育てられる）
-- ルームは追記専用の JSON ログ。`after=<seq>` で差分ポーリングするので、どこからでも合流できる
-- 立ち上げ方は端末・nohup・systemd・cron・タスクスケジューラまで → **[docs/bot.md](docs/bot.md)**
-
-サーバー側でその場で答えるだけなら、ボットなしでも 1 リクエストで済みます:
-
-```bash
-curl -s -X POST localhost:8080/api/rooms/actor-x/messages \
+# Terminal 3: post a message
+curl -s -X POST localhost:8080/api/rooms/team/messages \
   -H 'Content-Type: application/json' \
-  -d '{"text":"会議メモから議事録を作って","reply":true}' | jq -r '.reply.text'
+  -d '{"text":"Please review the release plan","author":"team-member"}'
+
+# Inspect the conversation
+python3 -m actor rooms show team
 ```
 
-## 道具（function calling）
+Edit a skill while the bot is running; it reloads `SKILL.md` on the next turn. Use `--mention` to route messages among multiple bots in one room. The room is append-only, and bots resume from a saved cursor. See the [bot operations guide](docs/bot.md) for `systemd`, `cron`, and Windows Task Scheduler examples.
 
-ボットは与えられた道具を **自分で選んで実行**します（`🛠` として表示・記録されます）。
+For a one-off server-side reply without a resident bot, send `{"reply":true}` to `POST /api/rooms/<name>/messages`.
 
-```bash
-python3 -m actor tools                      # 使える道具の一覧
-python3 -m actor tools --json               # 宣言（JSON Schema）まで確認
-python3 -m actor tools --run now            # 道具だけを直接実行（動作確認）
-python3 -m actor "今日は何日？ README.md の冒頭も教えて"   # モデルが now / read_file を呼ぶ
-```
+## Tools (function calling)
 
-| 道具 | 内容 | 既定 |
+The model can choose from the enabled tools, which are recorded in the conversation. Read-only tools are enabled by default; writing files and network access require explicit opt-in.
+
+| Tool | Purpose | Default |
 | --- | --- | --- |
-| `now` | 現在の日時・曜日 | 有効 |
-| `read_file` / `list_files` | `ACTOR_TOOLS_ROOT` 内の読み取り・一覧 | 有効 |
-| `list_skills` / `read_skill` | 読み込み済み SKILL.md を探す・読む | 有効 |
-| `write_file` | ファイル書き込み（`ACTOR_TOOLS_ALLOW_WRITE=true`） | 無効（危険） |
-| `http_get` | 外部への GET（`ACTOR_TOOLS_ALLOW_NETWORK=true`） | 無効（危険） |
+| `now` | Current date, time, and timezone | Enabled |
+| `read_file` / `list_files` | Read and list files under `ACTOR_TOOLS_ROOT` | Enabled |
+| `list_skills` / `read_skill` | Discover and read loaded skills | Enabled |
+| `write_file` | Write a file (`ACTOR_TOOLS_ALLOW_WRITE=true`) | Disabled |
+| `http_get` | Make an external GET request (`ACTOR_TOOLS_ALLOW_NETWORK=true`) | Disabled |
 
-- パスは `ACTOR_TOOLS_ROOT`（既定はカレント）の外へ出られません（`../` や絶対パスは拒否）
-- スキルの frontmatter に `allowed-tools: [read_file, now]` と書くと、**そのスキルを使っている間だけ**その和集合に絞られます
-- 1ターンの往復回数は `ACTOR_MAX_TOOL_ROUNDS`（既定 4・最後の1回は答えを書くために残す）
-- `python3 -m actor serve` の `/api/health` に `tools` が、UI には道具チップが出ます
+Tool paths cannot escape `ACTOR_TOOLS_ROOT`; traversal and absolute paths are rejected. A skill's `allowed-tools` can narrow the available set while that skill is active. The number of tool rounds is bounded by `ACTOR_MAX_TOOL_ROUNDS` (default: 4).
 
-> シミュレータ（API キーなし）でも道具の流れは同じ経路で動きます（`now` / `list_skills` / `read_file` を自動で試します）。
-> 本物の Gemini では、モデルが `functionCall` を返したときに同じループが回ります（REST / SDK の両方）。
-
-## 画像・PDF を添えて聞く
+## Ask with images and PDFs
 
 ```bash
-python3 -m actor --attach ./design.png "この画面の課題を3つ挙げて"
-python3 -m actor --attach ./仕様.pdf --attach ./メモ.md "仕様の抜けを指摘して"
-python3 -m actor rooms say "この図を見て" --attach ./図.png --reply   # ルーム経由
+python3 -m actor --attach ./design.png "List three usability issues"
+python3 -m actor --attach ./spec.pdf --attach ./notes.md "Find gaps in this specification"
+python3 -m actor rooms say "Review this diagram" --attach ./diagram.png --reply
 ```
 
-- Web UI では入力欄の **📎** から選択（画像はサムネイル付きで表示されます）
-- HTTP API では `attachments: [{name, mime_type, data}]`（`data` は base64）を `POST /api/chat`・`/api/rooms/<name>/messages` に渡す
-- 上限は既定で **1件 10MB / 6件**（`ACTOR_MAX_ATTACHMENT_MB`・`ACTOR_MAX_ATTACHMENTS`）
-- 添付はプロバイダへ `inlineData` として渡り、セッション / ルームの JSON に保存（`ACTOR_STORE_ATTACHMENTS=false` で当該ターンのみ）
-- 一覧 API は base64 を返しません（中身が要るときは `GET /api/rooms/<name>?attachments=1`）
+The web UI accepts attachments through its paperclip button. The HTTP API accepts `attachments: [{name, mime_type, data}]`, where `data` is base64, on `/api/chat` and `/api/rooms/<name>/messages`. Defaults allow up to six attachments of 10 MB each (`ACTOR_MAX_ATTACHMENTS`, `ACTOR_MAX_ATTACHMENT_MB`). Attachments are sent to the provider as inline data; set `ACTOR_STORE_ATTACHMENTS=false` to keep them only for the current turn. Room-list endpoints do not return base64; request `?attachments=1` when the contents are needed.
 
 ## Portable Agent Skills / Agensi
 
-`actor skills lint --target agensi` でローカル検査し、`actor skills export <name> --target agensi -o <name>.zip` で1スキル単位のZIPを作れます。Lintは公開スキャナーの近似で、審査通過を保証しません。提出・アカウント操作は行わず、ZIPを確認したうえで作者が手動で提出してください。詳細は [docs/agensi.md](docs/agensi.md) と [docs/skills-compat.md](docs/skills-compat.md)、変更履歴は [CHANGELOG.md](CHANGELOG.md)、[v0.2.1 セキュリティ修正リリースノート](docs/release-notes-v0.2.1.md)、[v0.2.0 リリースノート](docs/release-notes-v0.2.0.md) を参照してください。
+Run `actor skills lint --target agensi` to check skills locally and `actor skills export <name> --target agensi -o <name>.zip` to create a one-skill ZIP. Linting is a conservative approximation, not a guarantee of acceptance. Actor does not submit packages or operate an Agensi account; review the ZIP and submit it yourself. See the [Agensi workflow](docs/agensi.md) and [SKILL.md compatibility notes](docs/skills-compat.md).
 
-## ルームのトークン保護と Webhook
+## Protect rooms with tokens and webhooks
 
-`ACTOR_ROOM_TOKEN` はすべての `/api/*` エンドポイントを保護します。非ループバックへ bind する際は必須です。Webhook は必要な場合だけ設定してください。
+Set `ACTOR_ROOM_TOKEN` to require authentication on every `/api/*` endpoint. It is mandatory when binding to a non-loopback interface. Store the token in a local secret manager or environment; do not put a literal token in source, logs, fixtures, or documentation. If you use a webhook, keep its signing secret separate.
 
 ```bash
-export ACTOR_ROOM_TOKEN='replace-with-a-long-random-token' # 全APIに必要
-export ACTOR_WEBHOOK_URL='https://example.com/actor-hook'
-export ACTOR_WEBHOOK_SECRET='change-me'             # X-Actor-Signature: sha256=... が付く
+export ACTOR_ROOM_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+export ACTOR_WEBHOOK_URL="https://example.com/actor-hook"
+export ACTOR_WEBHOOK_SECRET="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
 python3 -m actor serve --port 8080
 ```
 
 ```bash
-curl -s -X POST localhost:8080/api/rooms/actor-x/messages \
-  -H 'X-Actor-Token: hireme-please-change' \
-  -H 'Content-Type: application/json' -d '{"text":"おはよー"}'
-# Authorization: Bearer <token> も可。URLクエリにはトークンを付けないでください。
+curl -s -X POST localhost:8080/api/rooms/team/messages \
+  -H "X-Actor-Token: ${ACTOR_ROOM_TOKEN}" \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"Hello"}'
 ```
 
-- トークン未指定または不正なリクエストは **403**。Web UI は起動時にサーバーがトークンを要求した場合、入力を促します。API クライアントでは `X-Actor-Token` または `Authorization: Bearer` ヘッダーを設定してください。
-- 発言があると `message` イベントを JSON で POST します:
-  `{"event":"message","ts":...,"room":"actor-x","message":{...},"reply":{...},"count":2}`
-- 署名は `HMAC-SHA256(secret, body)` の `sha256=<hex>`（GitHub 方式）なので、受け側で検証できます
-- 送信は非同期・失敗しても会話は止まりません（5xx は最大3回リトライ）。`/api/health` の `webhook_stats` で確認できます
+Invalid or missing tokens receive **403**. The web UI prompts for a token if the server requires one. API clients can use `X-Actor-Token` or `Authorization: Bearer`. Tokens in URL query strings are not accepted. Webhook messages are sent asynchronously as JSON; failures do not interrupt the conversation, and transient server errors are retried up to three times. The signature is `HMAC-SHA256(secret, body)` in the `sha256=<hex>` format. Inspect `/api/health` for `webhook_stats`.
 
 ## CLI
 
-```
+```text
 $ python3 -m actor
-🎭 Actor v0.2.1 — SKILL.md 駆動の Gemini 対話クライアント
-/help でコマンド一覧、/exit で終了。
-シミュレータで動作中 — GEMINI_API_KEY を設定すると本物の Gemini に切り替わります。
-スキル 5 件 / 保存先 /path/to/Actor/.actor
+Actor v0.2.1 — SKILL.md-driven Gemini client
+Use /help for commands and /exit to quit.
+Running in simulator mode; configure an API key locally to use Gemini.
+5 skills / data directory: /path/to/Actor/.actor
 
-you [-,auto|think] › コミットログからリリースノートを書いて
-▶ 適用スキル: release-notes(15.0)
-  system_instruction: 4,102 文字 ≈ 1,188 tokens
-（応答がストリーミング表示されます）
+you [-,auto|think] › Write release notes from these commits
+▶ Selected skill: release-notes
+  system_instruction: 4,102 characters
+Streaming response...
 tokens: in 1,240 / out 812  model: gemini-3-flash
 ```
 
-### スキルの呼び出し方（Gemini と同じ操作感）
+### Invoke skills
 
-| 方法 | 例 | 挙動 |
+| Method | Example | Behavior |
 | --- | --- | --- |
-| `/` で呼び出す | `/minutes-writer 会議メモから議事録` | そのターンだけ適用 |
-| 固定（スタック） | `/use code-review brand-voice` | 以降のターンも適用。複数可 |
-| 自動選択 | 何も指定しない | 依頼文のスコアが閾値以上なら適用 |
-| 解除 | `/use none` | 固定を解除 |
+| Call with `/` | `/minutes-writer Turn these notes into minutes` | Applies for this turn only |
+| Pin a stack | `/use code-review brand-voice` | Applies on later turns until cleared |
+| Automatic selection | Enter a request without a skill command | Selects skills whose score meets the threshold |
+| Clear pinned skills | `/use none` | Removes pinned skills |
 
-REPL コマンド: `/help` `/skills` `/use` `/auto` `/think` `/stream` `/model` `/system` `/show` `/new` `/sessions` `/load` `/title` `/create` `/export` `/exit`
+REPL commands include `/help`, `/skills`, `/use`, `/auto`, `/think`, `/stream`, `/model`, `/system`, `/show`, `/new`, `/sessions`, `/load`, `/title`, `/create`, `/export`, and `/exit`.
 
-便利な機能:
-
-- `/create 週次レポートを毎回同じ形式で作るスキル` … 会話から SKILL.md を生成 → 確認 → 保存
-- `/export` … Gemini アプリにアップロードできる ZIP（最上位に `SKILL.md`）を書き出し
-- `--json` … パイプや CI から扱いやすい JSON 出力
-- 標準入力からのパイプ … `cat meeting.txt | python3 -m actor "これを議事録にして"`
-
----
+Other useful features include `/create` to draft a skill from a conversation, `/export` to create a ZIP, `--json` for scripts and CI, and piping input with `cat meeting.txt | python3 -m actor "Create minutes"`.
 
 ## Web UI
 
-`python3 -m actor serve` して `http://localhost:8080` を開くと、Gemini のスキルに寄せた UI が出ます。
+Run `python3 -m actor serve` and open `http://localhost:8080`.
 
-- **左**: スキル一覧（クリックでスタック適用、`ⓘ` で詳細）／会話履歴
-- **中央**: チャット。入力欄で `/` を打つとスキル候補が出て、`↑↓` + `Enter` で確定
-- **右**: インスペクタ。**適用スキル / 自動選択スコア / 実際の system_instruction / トークン数**をリアルタイム表示
-- **応答内**: `🧠 思考ログ`（thinkingConfig）と、どのスキルが効いたかのチップ表示
-- **「会話からスキルを作る」**: 日本語で説明 → ドラフト生成 → その場で編集して保存
+- **Left:** skill list (click to pin a stack, `ⓘ` for details) and conversation history.
+- **Center:** chat; type `/` to browse skills and use the arrow keys plus Enter to select one.
+- **Right:** inspector showing applied skills, auto-selection scores, the composed `system_instruction`, and token counts.
+- **In responses:** thinking log and chips identifying the skills used.
+- **Create a skill from chat:** describe the task, review the draft, and edit it before saving.
 
-UI はビルド不要の素の HTML/CSS/JS（`actor/web/`）です。CDN も外部フォントも読みません。
-
----
+The UI is plain HTML, CSS, and JavaScript in `actor/web/`; it needs no build step, CDN, or external fonts.
 
 ## HTTP API
 
-| メソッド | パス | 説明 |
+| Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/health` | 稼働状況（プロバイダ・スキル数・API キーの本数） |
-| GET | `/api/config` | 設定（キーの値は返しません） |
-| GET/POST/DELETE | `/api/key` | キーの状態確認（本数・429 の残り時間・通算の統計）/ 保存して即切り替え / 解除（私用向け） |
-| GET | `/api/skills?q=議事録` | スキル一覧（`q` で自動選択スコアも返す） |
-| GET | `/api/skills/<name>?full=1` | スキル詳細（合成後の `system_instruction` を含む） |
-| POST | `/api/skills` | スキル作成 `{name, description, instructions}` |
-| PUT | `/api/skills/<name>` | スキル更新 |
-| DELETE | `/api/skills/<name>` | スキル削除 |
-| POST | `/api/skills/draft` | `{request}` から SKILL.md のドラフトを生成 |
-| GET | `/api/skills/export?names=a,b` | ZIP 書き出し |
-| POST | `/api/select` | `{message, skills}` の選択結果だけを先読み（LLM を呼ばない） |
-| GET/POST | `/api/sessions` | 会話一覧 / 新規作成 |
-| GET/DELETE | `/api/sessions/<id>` | 会話の取得 / 削除 |
-| GET/POST | `/api/rooms` | ルーム一覧 / 作成 |
-| GET | `/api/rooms/<name>?after=<seq>` | ルームの差分取得（常駐ボットの合流点・`attachments=1` で base64 も） |
-| POST | `/api/rooms/<name>/messages` | 発言を追記（`reply: true` でその場で返事も生成・`attachments` 可・トークン必須） |
-| DELETE | `/api/rooms/<name>` | ルーム削除（トークン必須） |
-| POST | `/api/chat` | 1ターン実行（JSON） |
-| POST | `/api/chat/stream` | 1ターン実行（**SSE** でトークン逐次配信） |
+| GET | `/api/health` | Health, provider, skill count, and key count |
+| GET | `/api/config` | Settings (never returns raw keys) |
+| GET/POST/DELETE | `/api/key` | Inspect, save, or clear local key settings |
+| GET | `/api/skills?q=minutes` | List skills and optional selection scores |
+| GET | `/api/skills/<name>?full=1` | Skill details and composed instruction |
+| POST | `/api/skills` | Create a skill: `{name, description, instructions}` |
+| PUT / DELETE | `/api/skills/<name>` | Update or delete a skill |
+| POST | `/api/skills/draft` | Draft a `SKILL.md` from `{request}` |
+| GET | `/api/skills/export?names=a,b` | Export selected skills as a ZIP |
+| POST | `/api/select` | Preview selection for `{message, skills}` without calling a model |
+| GET / POST | `/api/sessions` | List or create conversations |
+| GET / DELETE | `/api/sessions/<id>` | Read or delete a conversation |
+| GET / POST | `/api/rooms` | List or create rooms |
+| GET | `/api/rooms/<name>?after=<seq>` | Read room updates; add `attachments=1` for attachment data |
+| POST | `/api/rooms/<name>/messages` | Append a message; `reply:true` generates a server-side reply |
+| DELETE | `/api/rooms/<name>` | Delete a room |
+| POST | `/api/chat` | Run one JSON chat turn |
+| POST | `/api/chat/stream` | Run one chat turn and stream tokens as SSE |
 
 ```bash
-# スキルが自動選択される様子を確認（LLM は呼ばれません）
+# Preview automatic selection without calling a model
 curl -s localhost:8080/api/select -H 'Content-Type: application/json' \
-  -d '{"message":"コミットログからリリースノートを書いて"}' | jq
-# → {"names":["release-notes"],"auto_scores":[{"name":"release-notes","score":15.0}], ...}
+  -d '{"message":"Write release notes from these commits"}' | jq
 
-# 1ターン実行
+# Run one turn
 curl -s localhost:8080/api/chat -H 'Content-Type: application/json' \
-  -d '{"message":"議事録を作って","skills":["minutes-writer"]}' | jq -r .text
+  -d '{"message":"Create meeting minutes","skills":["minutes-writer"]}' | jq -r .text
 
-# ストリーミング（SSE）
+# Stream a turn using server-sent events
 curl -N localhost:8080/api/chat/stream -H 'Content-Type: application/json' \
-  -d '{"message":"この差分をレビューして"}'
+  -d '{"message":"Review this diff"}'
 ```
 
-イベント種別: `open` → `selection` → `prompt`（合成済み system_instruction）→ `thought` / `tool_call` / `tool_result` → `text` → `done`（usage・`tool_calls`・セッションID）。
+Stream events are emitted in this order as applicable: `open`, `selection`, `prompt`, `thought`, `tool_call`, `tool_result`, `text`, and `done` (usage, tool calls, and session ID).
 
----
+## Writing `SKILL.md`
 
-## SKILL.md の書き方
-
-```
+```text
 skills/
   minutes-writer/
-    SKILL.md              ← 必須（フォルダの最上位）
+    SKILL.md              # Required at the skill folder root
     references/
-      format.md           ← 任意。テキストは system_instruction に自動同梱
-      style.pdf           ← 任意。画像/PDF は inlineData として添付
-  code-review.md          ← 単体 .md ファイルでも可
+      format.md           # Optional text reference, included in system instructions
+      style.pdf           # Optional binary reference, sent as inline data
+  code-review.md          # A standalone Markdown file is also supported
 ```
 
-```markdown
+A skill uses YAML frontmatter and a Markdown body. Required output headings are a contract; write the body of the response in the user's language.
+
+````markdown
 ---
 name: minutes-writer
-description: 会議の文字起こしから決定事項とアクションアイテムを抽出して議事録に整形する
-version: 1.0.0
-tags: [議事録, 会議]
-temperature: 0.4           # 任意: スキル単位で生成パラメータを上書きできる
-greeting: 議事録を作ります   # 任意: 常駐ボットの起動あいさつ
+description: Creates structured meeting minutes. Use when the user provides meeting notes or a transcript.
+license: MIT
+metadata:
+  version: "1.0.0"
+  tags: [meeting, minutes]
+temperature: 0.4
 ---
 
-# 目的
-（このスキルが何を達成するか）
+# Purpose
+State what the skill achieves.
 
-# 入力
-- 必要な材料
+# Input
+- List required materials.
 
-# 手順
-1. 具体的な動詞で書く
-2. 誰が実行しても同じ結果になる粒度にする
+# Procedure
+1. Start each step with a concrete action.
+2. Use enough detail for another person to produce the same result.
 
-# 出力フォーマット
+# Output format
 ```markdown
-## 結論
+## Summary
 ```
 
-# 確認事項
-- やってはいけないこと（捏造・誇張・勝手な補完）
-```
+# Checklist
+- Do not invent or exaggerate facts.
+````
 
-ルール（Google のスキル仕様に合わせています）:
+Use lowercase kebab-case for `name`; keep the folder name identical. Actor supports per-skill generation settings such as `temperature`, `top_p`, `max_output_tokens`, `thinking_budget`, and `model`. A text reference is included in the `system_instruction` up to `ACTOR_INLINE_REFERENCE_LIMIT` (default: 24,000 characters); images and PDFs are sent as inline data. References are size-limited, and nested code fences are wrapped safely when composed into instructions.
 
-- `name` は **ケバブケース**（`my-skill`）。大文字・アンダースコア・日本語は正規化されます（警告つき）
-- frontmatter で `temperature` / `top_p` / `max_output_tokens` / `thinking_budget` / `model` を書くと、そのスキルを適用したターンだけパラメータが変わる（複数スキルでは先に適用されたものを優先）
-- `SKILL.md` はフォルダの最上位に置く。ZIP にする場合も最上位に必要
-- 参照ファイルの合計は 100MB 以下（Gemini 側の制限）。テキストは既定 24,000 文字まで `system_instruction` に同梱
-- ネストしたコードフェンス（テンプレート内の ```` ``` ````）も壊れないよう、参照資料は長いフェンスで包んで埋め込みます
+## Automatic skill selection
 
-### 自動選択の仕組み
+Actor deterministically scores the request against skill names, descriptions, and tags using English words and character bigrams.
 
-依頼文とスキル名／description／タグを、英単語と日本語の文字バイグラムで照合し、決定的にスコアリングします。
+| Match | Score |
+| --- | ---: |
+| Explicit `/name` or `@name` | +100 |
+| Skill name appears in the request | +5 |
+| Exact or partial name match | +5 / +3 |
+| Description word or bigram match | +1 to +3 |
+| Tag match | +1.5 |
 
-| 条件 | 加点 |
-| --- | --- |
-| `/name` `@name` で明示 | +100 |
-| スキル名が依頼文に含まれる | +5 |
-| 名前に単語一致 / 部分一致 | +5 / +3 |
-| description の単語・バイグラム一致 | +1 〜 +3 |
-| タグ一致 | +1.5 |
+Skills scoring at least the default threshold (`2.0`) are selected, up to three. Configure `ACTOR_AUTO_SELECT_THRESHOLD` and related settings; inspect scores in the web UI.
 
-閾値（既定 `2.0`）以上を最大 `3` 件まで採用。`ACTOR_AUTO_SELECT_THRESHOLD` などで調整できます。
-選ばれたスキルは UI のインスペクタでスコア付きで確認できます。
+## Configuration
 
----
+Settings can come from `.env`, environment variables, and CLI options. Precedence is **CLI > environment > `.env`**.
 
-## 設定
+### Provider choices
 
-`.env`（`.env.example` 参照）／環境変数／CLI 引数のいずれでも設定できます。優先度は **CLI > 環境変数 > .env**。
-
-### プロバイダ（バックエンド）の選び方
-
-| `--provider` | 実装 | 追加依存 | 用途 |
+| `--provider` | Implementation | Extra dependency | Use |
 | --- | --- | --- | --- |
-| `auto`（既定） | キーがあれば `gemini`、無ければ `mock` | なし | とりあえずこれ |
-| `gemini` | `urllib` で REST を直叩き | なし | 依存を増やしたくない常駐ボット |
-| `genai` | 公式 **`google-genai` SDK** | `pip install google-genai` | 参考コードと同じ SDK で動かしたいとき |
-| `mock` | 内蔵シミュレータ | なし | オフライン検証・UI 開発 |
+| `auto` (default) | `gemini` when a key is present, otherwise `mock` | None | Recommended for most use |
+| `gemini` | REST via `urllib` | None | Keep runtime dependencies minimal |
+| `genai` | Official `google-genai` SDK | `pip install google-genai` | Use the official SDK backend |
+| `mock` | Built-in simulator | None | Offline checks and UI development |
 
-`google-genai` を入れておくと自動で SDK 経由になります（明示するなら `ACTOR_GEMINI_IMPL=genai`）。
-キーがどこから読まれたかは `actor doctor` の「API キー」行（出どころつき）で確認できます。
+Installing `google-genai` enables the SDK backend automatically unless `ACTOR_GEMINI_IMPL` specifies otherwise. `actor doctor` reports where the key was loaded from.
 
-| 変数 | 既定 | 説明 |
+| Variable | Default | Description |
 | --- | --- | --- |
-| `GEMINI_API_KEY` | – | Google AI Studio のキー。未設定ならシミュレータ |
-| `GEMINI_API_KEYS` | – | 複数キー（カンマ・空白・`;` 区切り）。429 は自動で次のキーへ |
-| `ACTOR_API_KEY_FILE` | `./.actor/api_key` | UI / `actor key set` が保存する場所 |
-| `ACTOR_KEYS_DIR` | `./.actor/keys` | `actor key add` 1 本 1 ファイルの保存先（`--env` なら `.env`） |
-| `ACTOR_KEY_COOLDOWN` | `60` | 429 のあと、そのキーを避ける秒数 |
-| `ACTOR_KEY_ROTATE` | `true` | 429 / 401 / 403 で次のキーへ自動で切り替える |
-| `ACTOR_PROVIDER` / `ACTOR_GEMINI_IMPL` | `auto` / `gemini` | `auto`/`gemini`/`genai`/`mock` と、キーがあるときの実装 |
-| `ACTOR_MODEL` | `gemini-3-flash` | モデル名 |
-| `ACTOR_MODEL_FALLBACKS` | `gemini-3.5-flash,gemini-2.5-flash` | 429 のときだけ使う逃げ道のモデル（空で無効） |
-| `ACTOR_BASE_URL` | `https://generativelanguage.googleapis.com` | 互換エンドポイント（Vertex は `https://aiplatform.googleapis.com`） |
-| `ACTOR_API_VERSION` / `ACTOR_MODEL_PATH` | `v1beta` / `models/{model}` | Vertex エクスプレスモードでは自動で `v1` / `publishers/google/models/{model}` |
-| `ACTOR_TEMPERATURE` / `ACTOR_TOP_P` / `ACTOR_MAX_OUTPUT_TOKENS` | 0.7 / 0.95 / 4096 | 生成パラメータ |
-| `ACTOR_THINKING_BUDGET` | `0` | 思考トークン予算。>0 で `thinkingConfig` を有効化 |
-| `ACTOR_SKILLS_DIR` | `./skills` | スキルフォルダ（複数可、区切りは `:` か `,`） |
-| `ACTOR_AUTO_SELECT` / `ACTOR_MAX_AUTO_SKILLS` / `ACTOR_AUTO_SELECT_THRESHOLD` | true / 3 / 2.0 | 自動選択の制御 |
-| `ACTOR_INLINE_REFERENCE_LIMIT` | 24000 | 参照テキストを埋め込む上限（文字） |
-| `ACTOR_DATA_DIR` / `ACTOR_HOST` / `ACTOR_PORT` | `./.actor` / 127.0.0.1 / 8080 | 保存先とサーバー |
-| `ACTOR_TOOLS` | `now,read_file,list_files,list_skills,read_skill` | 有効にする道具（`actor tools` で確認） |
-| `ACTOR_TOOLS_ROOT` | `.` | 道具が読み書きできる範囲（サンドボックス） |
-| `ACTOR_TOOLS_ALLOW_WRITE` / `ACTOR_TOOLS_ALLOW_NETWORK` | false | `write_file` / `http_get` を許可する |
-| `ACTOR_TOOLS_TIMEOUT` / `ACTOR_MAX_TOOL_ROUNDS` | 15 / 4 | 道具の実行タイムアウトと往復回数 |
-| `ACTOR_MAX_ATTACHMENT_MB` / `ACTOR_MAX_ATTACHMENTS` | 10 / 6 | 添付の上限 |
-| `ACTOR_STORE_ATTACHMENTS` | true | 添付の base64 を保存する（false なら当該ターンのみ） |
-| `ACTOR_ROOM_TOKEN` / `ACTOR_ROOM_PROTECT_READS` | – / false | 設定時は全 API を認証。読み取り限定の旧オプションは互換用 |
-| `ACTOR_CORS_ORIGINS` / `ACTOR_ALLOWED_HOSTS` | 空 / 空 | 明示的に許可する CORS Origin と Host（カンマ区切り） |
-| `ACTOR_WEBHOOK_URL` / `ACTOR_WEBHOOK_SECRET` | – | 発言を外部へ POST（HMAC 署名つき） |
-| `ACTOR_WEBHOOK_EVENTS` / `ACTOR_WEBHOOK_TIMEOUT` | `message` / 10 | 通知するイベントとタイムアウト |
+| `GEMINI_API_KEY` / `GEMINI_API_KEYS` | — | One or more provider keys |
+| `ACTOR_API_KEY_FILE` | `./.actor/api_key` | Key file used by the UI and `actor key set` |
+| `ACTOR_KEYS_DIR` | `./.actor/keys` | Per-key files used by `actor key add` |
+| `ACTOR_KEY_COOLDOWN` / `ACTOR_KEY_ROTATE` | `60` / `true` | Cooldown and rotation behavior after rate limits or authorization errors |
+| `ACTOR_PROVIDER` / `ACTOR_GEMINI_IMPL` | `auto` / `gemini` | Provider selection and implementation |
+| `ACTOR_MODEL` | `gemini-3-flash` | Model name |
+| `ACTOR_MODEL_FALLBACKS` | `gemini-3.5-flash,gemini-2.5-flash` | Models to try after the primary model is rate-limited; empty disables fallback |
+| `ACTOR_BASE_URL` | `https://generativelanguage.googleapis.com` | Compatible endpoint; Vertex uses `https://aiplatform.googleapis.com` |
+| `ACTOR_API_VERSION` / `ACTOR_MODEL_PATH` | `v1beta` / `models/{model}` | API version and model path; Vertex Express Mode is detected automatically |
+| `ACTOR_TEMPERATURE` / `ACTOR_TOP_P` / `ACTOR_MAX_OUTPUT_TOKENS` | `0.7` / `0.95` / `4096` | Generation settings |
+| `ACTOR_THINKING_BUDGET` | `0` | Enable thinking configuration when greater than zero |
+| `ACTOR_SKILLS_DIR` | `./skills` | Skill directories; multiple paths are supported |
+| `ACTOR_AUTO_SELECT` / `ACTOR_MAX_AUTO_SKILLS` / `ACTOR_AUTO_SELECT_THRESHOLD` | `true` / `3` / `2.0` | Automatic-selection controls |
+| `ACTOR_INLINE_REFERENCE_LIMIT` | `24000` | Maximum reference text included in instructions |
+| `ACTOR_DATA_DIR` / `ACTOR_HOST` / `ACTOR_PORT` | `./.actor` / `127.0.0.1` / `8080` | Data directory and server address |
+| `ACTOR_TOOLS` / `ACTOR_TOOLS_ROOT` | Read-only defaults / `.` | Enabled tools and filesystem sandbox root |
+| `ACTOR_TOOLS_ALLOW_WRITE` / `ACTOR_TOOLS_ALLOW_NETWORK` | `false` | Explicitly enable file writes or network requests |
+| `ACTOR_TOOLS_TIMEOUT` / `ACTOR_MAX_TOOL_ROUNDS` | `15` / `4` | Tool timeout and bounded tool rounds |
+| `ACTOR_MAX_ATTACHMENT_MB` / `ACTOR_MAX_ATTACHMENTS` | `10` / `6` | Attachment limits |
+| `ACTOR_STORE_ATTACHMENTS` | `true` | Store attachment data in local session and room files |
+| `ACTOR_ROOM_TOKEN` / `ACTOR_ROOM_PROTECT_READS` | — / `false` | Protect API access; the read-only legacy option remains for compatibility |
+| `ACTOR_CORS_ORIGINS` / `ACTOR_ALLOWED_HOSTS` | Empty | Explicit browser origins and hostnames allowed by the server |
+| `ACTOR_WEBHOOK_URL` / `ACTOR_WEBHOOK_SECRET` | — | Asynchronous, HMAC-signed room notifications |
+| `ACTOR_WEBHOOK_EVENTS` / `ACTOR_WEBHOOK_TIMEOUT` | `message` / `10` | Webhook events and timeout |
 
-補足:
+Sessions and room data are stored as local JSON under `.actor/`, which is ignored by Git. Retries use exponential backoff for server errors; rate limits rotate keys and may fall back to another model.
 
-- API キーは **サーバーの外へ出しません**（`/api/config` / `/api/key` は伏せ字・本数・出どころだけ返します）
-- `.actor/sessions/*.json` に会話が保存されます。`.gitignore` 済み
-- 5xx / タイムアウトは同じキーで指数バックオフ（最大3回）、429 は **キーを替えて再試行**します。
-  キーが全部 429 なら **モデルを替えて再試行**します（状態は `.actor/key_state.json` にキーの指紋とモデル別の枠だけ保存）
+## Project structure
 
----
-
-## 構成
-
-```
-actor/
-  __main__.py    python -m actor
-  cli.py         対話 REPL / 1回実行 / skills・doctor コマンド
-  server.py      HTTP サーバー（標準ライブラリのみ・SSE 対応）
-  chat.py        1ターンの流れ（選択 → 合成 → 呼び出し → 保存）
-  skills.py      SKILL.md の解析・検証・検索・生成・ZIP 書き出し
-  prompt.py      複数スキル → system_instruction の合成
-  providers.py   Gemini REST クライアント（urllib）+ オフラインシミュレータ
-  genai_provider.py  公式 google-genai SDK 経由のバックエンド（任意依存）
-  tools.py       道具（function calling）とサンドボックス
-  rooms.py       ルーム（常駐ボットの共有ログ）
-  webhooks.py    Webhook 送出（HMAC 署名・非同期リトライ）
-  bot.py         常駐ボット本体
-  sessions.py    会話の永続化
-  config.py      設定（.env / 環境変数 / CLI）
-  keys.py        複数キーのプール（429 で次のキーへ・伏せ字・状態の保存）
-  web/           Web UI（index.html / styles.css / app.js）
-skills/          サンプル: minutes-writer, code-review, release-notes, brand-voice, skill-author
-examples/mika/   常駐ボット用ペルソナの例（temperature 0.85）
-docs/bot.md      常駐ボット運用ガイド（systemd / cron / 複数ボット）
-docs/skills-compat.md  SKILL.md 互換メモ（allowed-tools など Actor 独自キー）
-docs/keys.md      複数キーと 429 の自動切り替え（設定・コマンド・設計）
-HANDOFF.md       引き継ぎ資料（全体像・運用手順・現在地）
-tests/           unittest + portable skill / security checks + optional UI smoke tests
+```text
+actor/                 CLI, HTTP server, chat, skill loading, providers, and tools
+actor/web/             Plain HTML, CSS, and JavaScript UI
+actor/resources/       Shared portable-skill resources
+skills/                Five English sample skills (default)
+i18n/ja/skills/        Japanese skills; opt in with --skills-dir
+examples/mika/         Example persona for a resident bot
+README.ja.md            Japanese README
+HANDOFF.md              Current project handoff
+LISTING.md              Agensi listing draft
+docs/                   English guides and reference documentation
+docs/ja/                Japanese documentation
+tests/                  Standard-library tests and optional UI smoke test
 ```
 
-## テスト
+## Tests
 
 ```bash
-python3 -m unittest discover -s tests -v      # full unit suite（依存ゼロ / google-genai があれば SDK 経路も検証）
-
-# UI のスモークテスト（任意・要 Node）
-npm install --no-save --package-lock=false jsdom
-ACTOR_ROOM_TOKEN=ui-smoke-test-token python3 -m actor serve --port 8080 &
-ACTOR_ROOM_TOKEN=ui-smoke-test-token node tests/ui_smoke.mjs
+python3 -m unittest discover -s tests -v
+python3 -m actor skills lint --target agensi
+python3 -m actor skills test
+python3 -m actor skills --skills-dir i18n/ja/skills lint --target agensi
+python3 -m actor skills --skills-dir i18n/ja/skills test
+python3 -m actor skills export minutes-writer --target agensi -o /tmp/minutes-writer.zip
 ```
 
-## セキュリティと注意
+The `skills test` commands run format-only checks; they do not call a model. `--live` uses the configured model and may incur charges. To verify the optional token-protected UI smoke test, install Node and `jsdom`, generate a temporary token locally, start the server with that token, and run `node tests/ui_smoke.mjs` with the same environment variable. CI performs this smoke test with an ephemeral token.
 
-- スキルは **ローカルの Markdown** です。Actor はスキル内のスクリプトを実行しません（内容を `system_instruction` に渡すだけ）。Gemini 側もアップロードされたスクリプトを実行しません
-- 社外秘をスキルに入れないでください。スキルの本文・参照資料は API へ送信されます
-- 生成された議事録などをそのまま社外へ出す前に、人が確認してください（サンプルスキルにも「要確認」を残す指示を書いています）
-- サーバーは既定で `127.0.0.1` に bind します。LAN / 外部へ bind する場合は `ACTOR_ROOM_TOKEN` を必ず設定してください。未設定なら起動を拒否します。
-- トークンを設定すると `/api/*` の全エンドポイント（チャット、履歴、スキル、キー、ルーム等）に必要です。`X-Actor-Token` または `Authorization: Bearer` を使います。
-- CORS は既定で無効です。ブラウザから別 Origin でアクセスする場合だけ `ACTOR_CORS_ORIGINS=https://your.example` を設定してください。Host は localhost / loopback / 明示した bind host / `ACTOR_ALLOWED_HOSTS` のみ許可します。ワイルドカード bind でLAN IPを使う場合は `ACTOR_ALLOWED_HOSTS` に追加してください。
-- 道具は既定で **読み取り専用** です。`write_file` / `http_get` は明示的に許可したときだけ有効になり、
-  パスは `ACTOR_TOOLS_ROOT` の中に閉じ込められます（`../` や絶対パスは拒否）
-- 添付した画像・PDF は Gemini API へ送信されます。機密のスクリーンショットを上げる前に確認してください
+## Security and cautions
 
-### 秘密情報の管理
+- Skills are local Markdown instructions. Actor does not execute scripts embedded in skills; it sends skill text to the provider, which may process it as instructions.
+- Do not place confidential material in a skill: the body and text references are sent to the provider.
+- Review generated minutes and other outputs before sharing them externally.
+- The server binds to `127.0.0.1` by default. Set `ACTOR_ROOM_TOKEN` before binding to a non-loopback interface; startup is refused without it.
+- When configured, the token protects every `/api/*` endpoint. Use `X-Actor-Token` or `Authorization: Bearer`; query-string tokens are not accepted.
+- CORS is disabled by default. Set `ACTOR_CORS_ORIGINS` only for browser access from an explicitly trusted origin. Host checks allow loopback, the configured bind host, and `ACTOR_ALLOWED_HOSTS`.
+- Tools are read-only by default. `write_file` and `http_get` require explicit opt-in, and file access is confined to `ACTOR_TOOLS_ROOT`.
+- Image and PDF attachments are sent to the configured provider; review them for sensitive content before uploading.
 
-- API キーと `ACTOR_ROOM_TOKEN` をソース管理へ追加しないでください。漏えい時はキーを無効化し、トークンを変更してサーバーを再起動してください。
-- ローカルでない環境では TLS を終端する信頼できるリバースプロキシを使い、不要なポート公開を避けてください。
-- 脆弱性の連絡先と対応方針は [SECURITY.md](SECURITY.md) を参照してください。
+### Secret management
 
-## 参考
+Keep API keys, room tokens, and webhook secrets out of version control and logs. If one is exposed, revoke or rotate it immediately. For non-local deployments, use a trusted TLS-terminating reverse proxy and avoid exposing unnecessary ports. See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
-- [支援について](FUNDING.md) — GitHub Sponsors の扱い、支援金の用途、プロジェクトの方針
-- Google 公式ブログ: *Let skills in Gemini tackle your most repetitive tasks*（2026-09-30）
-- Google Workspace Updates: *Introducing skills in the Gemini app and Workspace, plus what's next for Gems*（2026-09-30）
-- [SKILL.md 互換メモ](docs/skills-compat.md)
-- [API キーの複数管理と 429 の自動切り替え](docs/keys.md)
-- [HANDOFF.md](HANDOFF.md) — 引き継ぎ資料（現在地・運用手順・次の一手）
+## References
 
-## メモ: 参考コードとの対応
+- [Agensi-compatible skills](docs/agensi.md)
+- [SKILL.md compatibility](docs/skills-compat.md)
+- [API key management and quota rotation](docs/keys.md)
+- [Always-on bot operations](docs/bot.md)
+- [Funding policy](FUNDING.md)
+- [Japanese edition](README.ja.md)
+- [Japanese documentation](docs/ja/)
+- [Project handoff](HANDOFF.md)
+- [Changelog](CHANGELOG.md)
+
+## Mapping to the reference SDK
 
 ```python
-# 参考にされた書き方（google-genai）
-client = genai.Client()                       # GEMINI_API_KEY を自動読み込み
+from google import genai
+from google.genai import types
+
+client = genai.Client()
 chat = client.chats.create(
     model="gemini-2.5-flash",
     config=types.GenerateContentConfig(
@@ -570,25 +416,21 @@ chat = client.chats.create(
         temperature=0.85,
     ),
 )
-response = chat.send_message("こんにちは。")
+response = chat.send_message("Hello.")
 ```
 
-Actor での対応:
-
-| 参考コード | Actor |
+| Reference SDK | Actor |
 | --- | --- |
-| `load_skill_prompt("./skills/mika/SKILL.md")` | `SkillLibrary(...).get("mika")` → 複数スキルを1つの `system_instruction` に合成 |
-| `config=temperature=0.85` | SKILL.md の frontmatter に `temperature: 0.85` と書く |
-| `client.chats.create(...)` | `ChatEngine` + `.actor/sessions/*.json`（ターンごとにスキルを差し替えたいので履歴は自前で保持） |
-| `chat.send_message("こんにちは。")` | `actor "こんにちは"` / `POST /api/chat` / 常駐ボットなら `POST /api/rooms/<room>/messages` |
-| `client = genai.Client()` | `--provider genai`（SDK あり）/ `--provider gemini`（SDK なし・urllib 実装） |
-| `config=tools=[...]`（function calling） | スキルの `allowed-tools` と `ACTOR_TOOLS`。ループは `ChatEngine.turn()` が回す |
-| `types.Part(inline_data=...)`（画像/PDF） | `--attach ./図.png` / UI の 📎 / `attachments` フィールド |
-| `print(response.text)` | CLI 表示・Web UI・SSE ストリーム・ルームへの書き込み |
+| `load_skill_prompt("./skills/mika/SKILL.md")` | `SkillLibrary(...).get("mika")`; multiple skills are composed into one instruction |
+| `temperature=0.85` | Set `temperature: 0.85` in the skill frontmatter |
+| `client.chats.create(...)` | `ChatEngine` plus local `.actor/sessions/*.json` |
+| `chat.send_message(...)` | `actor "Hello"`, `POST /api/chat`, or a room message |
+| `genai.Client()` | `--provider genai` (SDK) or `--provider gemini` (standard-library REST) |
+| Function calling tools | Skill `allowed-tools` and `ACTOR_TOOLS`, executed by `ChatEngine.turn()` |
+| Image or PDF parts | `--attach`, the UI attachment button, or the API `attachments` field |
 
-SDK 経由でも `systemInstruction` に SKILL.md が入り、`temperature` がスキル定義で上書きされることを、
-偽サーバーを使った回帰テスト（`tests/test_actor.py` の `GenAiWireTest`）で検証しています。
+The optional SDK path is covered by regression tests when `google-genai` is installed; the core package has no mandatory dependencies.
 
-## ライセンス
+## License
 
-MIT（[LICENSE](LICENSE)）
+MIT. See [LICENSE](LICENSE).

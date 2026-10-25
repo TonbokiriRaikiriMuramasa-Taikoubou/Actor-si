@@ -5,59 +5,59 @@ license: MIT
 metadata:
   version: "1.0.0"
   tags:
-    - リリース
-    - ドキュメント
-    - ライティング
+    - releases
+    - documentation
+    - writing
 ---
 
-# 目的
-開発者向けの変更情報（コミットログ・PR タイトル・差分メモ）を、
-利用者が「自分に関係あるか」を3秒で判断できるリリースノートに変換する。
+# Purpose
+Turn developer-facing change records (commit logs, pull-request titles, or change notes) into release notes that help users decide within seconds whether an update matters to them.
 
-# 入力
-- コミットログ / PR 一覧 / 変更点メモ（どの形式でもよい）
-- バージョン番号（不明なら `vX.Y.Z` と書いて質問する）
-- 想定読者（既定: エンドユーザー。技術者向け指定があればそれに従う）
+# Input
+- Commit logs, a pull-request list, or change notes (any format).
+- The version number. If unknown, write `vX.Y.Z` and ask for it.
+- The intended audience (default: end users; follow an explicit request for a technical audience).
 
-# 手順
-1. 変更を **追加 / 変更 / 修正 / 非推奨（破壊的変更）** の4分類に振り分ける。
-2. 内部リファクタ・テスト・CI など、利用者に影響しない変更は「その他」にまとめて1行にする。
-3. 各項目を「利用者視点の1文」に書き換える。関数名やファイルパスは原則書かない。
-4. 破壊的変更には **移行手順** を必ず添える（旧→新のコード例つき）。
-5. ユーザーへの影響度が高い順に並べ替える。
-6. 冒頭に3行以内のハイライトを書く。
+# Procedure
+1. Classify changes as **Added / Changed / Fixed / Deprecated (breaking changes)**.
+2. Combine changes with no user impact (internal refactors, tests, CI) into a single line under “Other”.
+3. Rewrite each item as one sentence from the user's perspective. Usually omit function names and file paths.
+4. For every breaking change, include **migration steps**, with before-and-after code examples.
+5. Sort items from highest to lowest user impact.
+6. Start with highlights in no more than three lines.
 
-# 出力フォーマット
-各見出しを必ず出力し、該当項目がなければ「なし」と記載する。
+# Output format
+Include every heading below. If a category has no items, write “None”.
 
 ```markdown
-# リリースノート
+# Release notes
 
-バージョン: <バージョン> — 日付: <日付>
+Version: <version> — Date: <date>
 
-## ハイライト
-- （最も重要な変更を3行以内で）
+## Highlights
+- (The most important changes, in no more than three lines)
 
-## 追加
+## Added
 - ...
 
-## 変更
+## Changed
 - ...
 
-## 修正
+## Fixed
 - ...
 
-## 互換性のない変更
-- **変更内容**
-  - 影響:
-  - 移行: `旧コード` → `新コード`
+## Breaking changes
+- **Change**
+  - Impact:
+  - Migration: `old code` → `new code`
 
-## その他
-- 内部改善・ドキュメント更新など
+## Other
+- Internal improvements, documentation updates, and similar items
 ```
 
-# 確認事項
-- コミットメッセージをそのまま貼らない。必ず利用者視点に翻訳する。
-- 共通の判断原則は `references/principles.md` を適用する。
-- 破壊的変更を見落としていないか、`BREAKING` `!` `removed` `deprecated` を必ず検索する。
-- 絵文字は使わない。
+# Checklist
+- Write prose in the user's language while keeping the required headings above exactly as specified.
+- Do not paste commit messages verbatim; explain changes from the user's perspective.
+- Apply the shared principles in `references/principles.md`.
+- Search for `BREAKING`, `!`, `removed`, and `deprecated` to avoid missing breaking changes.
+- Do not use emoji.

@@ -5,50 +5,50 @@ license: MIT
 metadata:
   version: "1.0.0"
   tags:
-    - コードレビュー
-    - 品質
+    - code-review
+    - quality
 ---
 
-# 目的
-差分（diff / コード片 / PR）をレビューし、**バグにつながる指摘だけ**を重大度つきで返す。
-好みの押し付けや言い換え提案はノイズなので出さない。このスキルは読み取り専用で、ファイルを変更しない。
+# Purpose
+Review a diff, code fragment, or pull request and report **only actionable findings that could cause bugs**, ranked by severity. Do not add stylistic preferences or rewording suggestions. This skill is read-only; do not change files.
 
-# 入力
-- レビュー対象のコードまたは diff
-- 言語・実行環境・プロジェクトの規約（不明なら一般則で判断）
+# Input
+- The code or diff to review.
+- The language, runtime, and project conventions (if unknown, use general principles).
 
-# 手順
-1. `references/checklist.md` を上から順に適用し、該当箇所を探す。
-2. 指摘は **重大度**（Critical / High / Medium / Low）を判定する。
-   - Critical: データ破壊・認証回避・本番停止に直結
-   - High: 特定条件下でバグ・例外・情報漏えい
-   - Medium: 保守性・性能に明確な悪影響
-   - Low: 軽微（ただしバグの芽のみ。好みは出さない）
-3. 各指摘に **最小の修正案**（コード片）を添える。
-4. テストが必要な指摘には、確認手順（入力例）を書く。
-5. 指摘ゼロなら「LGTM」とだけ書き、無理に何か書かない。
+# Procedure
+1. Work through `references/checklist.md` from top to bottom and inspect relevant areas.
+2. Assign a **severity** to each finding (Critical / High / Medium / Low).
+   - Critical: directly causes data loss, authorization bypass, or production outage.
+   - High: causes a bug, exception, or information disclosure under specific conditions.
+   - Medium: has a clear negative impact on maintainability or performance.
+   - Low: minor, but still a potential bug; do not report preferences.
+3. Include the **smallest viable fix** (a code snippet) for each finding.
+4. For findings that need testing, provide a verification procedure and sample input.
+5. If there are no findings, write only “LGTM”; do not invent an issue.
 
-# 出力フォーマット
+# Output format
 ```markdown
-## 結論
-指摘 N 件（Critical: x / High: y / Medium: z / Low: w）
+## Conclusion
+N finding(s) (Critical: x / High: y / Medium: z / Low: w)
 
-## 指摘
-### [High] <1行で内容>
-- 場所: <ファイル:行 or 関数名>
-- 問題: <なぜバグになるか。起動条件を具体的に>
-- 修正案:
-```言語
-// 修正後のコード
+## Findings
+### [High] <One-line summary>
+- Location: <file:line or function>
+- Problem: <why it is a bug and the specific trigger>
+- Fix:
+```language
+// corrected code
 ```
-- 確認: <再現手順 / テスト入力>
+- Verification: <reproduction steps or test input>
 
-## 良い点（任意・1〜2行）
+## What looks good (optional; 1–2 lines)
 ```
 
-# 確認事項
-- 共通の判断原則は `references/principles.md` を適用する。
-- 情報が足りない場合は「差分に含まれていないため未確認」と書く。
-- セキュリティ指摘は、再現条件を曖昧にしたまま出さない。
-- 命名・インデント・コメント量の好みは指摘しない。
-- 重大度の合計と、実際の指摘数が一致しているか最後に確認する。
+# Checklist
+- Write prose in the user's language while keeping the required headings above exactly as specified.
+- Apply the shared principles in `references/principles.md`.
+- If information is missing, say “Not verified because it is not included in the diff.”
+- Do not make security findings without stating concrete reproduction conditions.
+- Do not report preferences about naming, indentation, or comment volume.
+- At the end, verify that the severity counts add up to the number of findings.

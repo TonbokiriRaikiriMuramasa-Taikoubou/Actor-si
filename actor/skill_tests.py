@@ -10,10 +10,13 @@ from .sessions import Session
 from .skills import SkillLibrary, fenced_blocks
 
 
+OUTPUT_FORMAT_HEADINGS = {"# Output format", "# 出力フォーマット"}
+
+
 def _output_format_spec(skill: Any) -> str:
-    """Return the body of the `# 出力フォーマット` section plus referenced examples."""
+    """Return the body of the English or Japanese output-format section."""
     lines = skill.instructions.splitlines()
-    start = next((i for i, line in enumerate(lines) if line.strip() == "# 出力フォーマット"), None)
+    start = next((i for i, line in enumerate(lines) if line.strip() in OUTPUT_FORMAT_HEADINGS), None)
     if start is None:
         return ""
     result: list[str] = []
@@ -50,7 +53,7 @@ def _spec_headings(spec: str) -> list[str]:
         if not match:
             continue
         title = match.group(2).strip()
-        if re.search(r"(?i)(任意|必要な場合のみ|optional)", title):
+        if re.search(r"(?i)(任意|必要な場合のみ|optional|only when needed|if needed)", title):
             continue
         heading = f"{match.group(1)} {title}"
         if heading not in headings:

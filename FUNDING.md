@@ -1,21 +1,21 @@
-# 支援について
+# About support
 
-GitHub Sponsors での支援は任意です。これは製品の購入代金ではなく、特定の機能・納期・保守・個別サポートを約束するものでもありません。支援の有無によって、利用条件やロードマップへの優先権が変わることもありません。
+Support through GitHub Sponsors is voluntary. It is not payment for the software and does not promise specific features, delivery dates, maintenance, or personal support. Support does not provide priority in usage terms or the project roadmap.
 
-## 支援金の用途
+## How funds may be used
 
-支援金は、私自身の概念出しや今後の試作に使います。特定の成果物や実装が生まれることを保証するものではありません。
+Funds may support my own ideation and future prototypes. No particular deliverable or implementation is guaranteed.
 
-## 私の立場
+## About the author
 
-- 私は自然言語で考えを表現する一個人です。専門家としての助言、認証、完成度や成果の保証を主張するものではありません。
-- アイデアや概念は自由に解釈・応用・発展させてください。このリポジトリのソフトウェアを使う場合は、コードに適用される [MIT License](LICENSE) の条件に従ってください。
-- より保守性が高い、または目的に合うプロダクトがあれば、そちらを使うことをおすすめします。このプロジェクトに使い続ける義務や、乗り換えを避ける理由はありません。
+- I am an individual who expresses ideas in natural language. I do not claim to provide professional advice, certification, or guarantees of completeness or results.
+- You are free to interpret, apply, and develop ideas and concepts. If you use software from this repository, follow the terms of the [MIT License](LICENSE) that applies to the code.
+- If another product is more maintainable or better suited to your needs, I encourage you to use it. You have no obligation to keep using this project or to avoid switching.
 
-## 支援方法
+## How to support
 
-`.github/FUNDING.yml` は、このリポジトリの作者の GitHub Sponsors アカウントを示します。プロフィールと支払い設定はリポジトリのファイルから有効化できないため、支援ボタンが表示されない場合は、作者側で GitHub の手続きを完了するまで支援を受け付けられません。別の支援方法を追加する場合は、実際に利用可能な本人のリンクを確認してから設定します。
+`.github/FUNDING.yml` identifies the repository author's GitHub Sponsors account. The profile and payment setup cannot be activated by changing repository files. If a support button is not visible, the author may still need to complete GitHub's setup. Any additional support method will be added only after confirming that the author's link is active and correct.
 
-## 税務について
+## Taxes
 
-支援金を受け取った場合の税務上の扱いや申告要否は、金額や他の所得などの状況によって異なります。受領者自身が最新の公的情報を確認し、必要に応じて税務署等へ相談してください。この文書は税務助言ではありません。
+The tax treatment and reporting obligations for support income depend on the recipient's circumstances, including amounts and other income. Recipients should consult current official guidance and, when needed, a qualified tax professional. This document is not tax advice.

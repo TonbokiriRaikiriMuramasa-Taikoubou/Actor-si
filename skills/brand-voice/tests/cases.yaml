@@ -1,10 +1,10 @@
 [
   {
     "name": "preserve meaning and output sections",
-    "input": "整えてください。元文: 新機能を公開します。利用可能日は2026-11-01です。引用: ‘毎日確認します’。意味と事実は維持し、整えた文章と変更点を出してください。",
+    "input": "Polish this copy. Original: We are launching a new feature. It will be available on 2026-11-01. Quote: ‘We check every day.’ Preserve the meaning and facts, and provide the polished copy and changes.",
     "assert_contains": [
-      "## 整えた文章",
-      "## 変更点（最大7件）"
+      "## Polished copy",
+      "## Changes (up to 7 items)"
     ]
   }
 ]

@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from actor.config import load_settings
@@ -19,6 +20,21 @@ class SkillOutputContractTest(unittest.TestCase):
             self.assertEqual(case["check_type"], "format-only")
             self.assertIsNone(case["output"])
             self.assertIn("形式の検査のみ", case["message"])
+
+    def test_default_english_skill_directory_passes_format_checks(self):
+        result = run_cases(self.library)
+        self.assertTrue(result["passed"])
+        minutes = next(case for case in result["cases"] if case["skill"] == "minutes-writer")
+        self.assertIn("# <Meeting name> Meeting Minutes", minutes["spec_headings"])
+
+    def test_japanese_skill_directory_passes_when_explicitly_selected(self):
+        ja_dir = Path(__file__).resolve().parents[1] / "i18n" / "ja" / "skills"
+        library = SkillLibrary([ja_dir])
+        result = run_cases(library)
+        self.assertTrue(result["passed"])
+        self.assertEqual(len(result["cases"]), 5)
+        minutes = next(case for case in result["cases"] if case["skill"] == "minutes-writer")
+        self.assertIn("# <会議名> 議事録", minutes["spec_headings"])
 
     def test_angle_bracket_heading_placeholders_match_concrete_output(self):
         self.assertTrue(_assertion_matches("# 週次会議 議事録", "# <会議名> 議事録"))

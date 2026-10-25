@@ -16,6 +16,10 @@ from .skills import SKILL_FILENAME, TEXT_SUFFIXES, Skill, parse_frontmatter
 SOURCE_URL = "https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si"
 _PACKAGE_RESOURCES = Path(__file__).resolve().parent / "resources"
 _REPO_ROOT = Path(__file__).resolve().parent.parent
+_SHARED_SKILL_ROOTS = {
+    (_REPO_ROOT / "skills").resolve(),
+    (_REPO_ROOT / "i18n" / "ja" / "skills").resolve(),
+}
 
 
 def _resource_path(name: str) -> Path:
@@ -29,6 +33,18 @@ def _resource_path(name: str) -> Path:
 
 PRINCIPLES_PATH = _resource_path("principles.md")
 LICENSE_PATH = _resource_path("LICENSE")
+
+
+def _is_house_principles(skill: Skill, reference: Any) -> bool:
+    """Recognize the shared principles file beside a locale-specific skill set."""
+    path = Path(reference.path)
+    return (
+        reference.relpath == "references/principles.md"
+        and path.name == "principles.md"
+        and path.parent.name == "_house"
+        and path.parent.parent.resolve() == skill.root.parent.resolve()
+        and path.parent.parent.resolve() in _SHARED_SKILL_ROOTS
+    )
 
 
 @dataclass
@@ -184,7 +200,7 @@ def _portable_files(skill: Skill, keep_allowed_tools: bool = False) -> tuple[dic
             resolved = ref.path.resolve()
             resolved.relative_to(skill.root.resolve())
         except (ValueError, OSError):
-            is_shared_principles = relative == "references/principles.md" and resolved == PRINCIPLES_PATH.resolve()
+            is_shared_principles = _is_house_principles(skill, ref)
             if not is_shared_principles:
                 raise ValueError(f"reference escapes skill folder: {relative}")
         archive_name = prefix + str(pure)
@@ -193,7 +209,9 @@ def _portable_files(skill: Skill, keep_allowed_tools: bool = False) -> tuple[dic
         files[archive_name] = ref.path.read_bytes()
 
     principles_name = prefix + "references/principles.md"
-    files[principles_name] = PRINCIPLES_PATH.read_bytes()
+    shared_principles = next((ref for ref in skill.references if _is_house_principles(skill, ref)), None)
+    principles_path = Path(shared_principles.path) if shared_principles else PRINCIPLES_PATH
+    files[principles_name] = principles_path.read_bytes()
     license_name = prefix + "LICENSE"
     if license_name in files:
         raise ValueError("skill references may not override the MIT LICENSE")

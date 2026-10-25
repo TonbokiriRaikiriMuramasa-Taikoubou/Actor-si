@@ -1,84 +1,84 @@
-# Actor-si 引き継ぎメモ
+# Actor-si maintainer handoff
 
-最終確認: 2026-10-25  
-対象リポジトリ: <https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si>
+Last reviewed: 2026-10-25
 
-この文書は現在の実装と、これまでのセキュリティ・配布・スキル出力形式の点検結果をまとめたものです。過去の手順が残る [`docs/development-handoff.md`](docs/development-handoff.md) は2026-10-13時点のアーカイブとして扱い、現在の挙動はこの文書、README、各docsを参照してください。
+Repository: <https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si>
 
-## プロジェクト概要
+Use this file for maintained project guidance. The historical snapshot [`docs/development-handoff.md`](docs/development-handoff.md) is for context only; its test counts and implementation notes are not current.
 
-Actor-si は `SKILL.md` を読み込み、Gemini API と対話するローカル優先の CLI / HTTP API / Web UI / 常駐ボットです。コア機能は Python 標準ライブラリのみで動作し、Google の SDK は任意です。API キーがない場合はシミュレーターに切り替わります。
+## Language editions
 
-- Python パッケージと CLI: `actor/cli.py`, `pyproject.toml`
-- HTTP API・ブラウザ UI: `actor/server.py`, `actor/web/`
-- チャット・プロバイダー: `actor/chat.py`, `actor/providers.py`
-- スキル読み込み・合成: `actor/skills.py`, `actor/prompt.py`
-- portable ZIP の lint / export: `actor/portable.py`
-- スキルの出力形式テスト: `actor/skill_tests.py`
-- 組み込みスキル: `skills/`（brand-voice, code-review, minutes-writer, release-notes, skill-author）
+English is the default source edition. Japanese documentation and skills are maintained separately:
 
-詳細な利用方法と設定値は [`README.md`](README.md)、常駐ボットは [`docs/bot.md`](docs/bot.md)、スキルの互換性は [`docs/skills-compat.md`](docs/skills-compat.md)、portable export は [`docs/agensi.md`](docs/agensi.md) を参照してください。
+| Content | English (default) | Japanese |
+|---|---|---|
+| User guide | [`README.md`](README.md) | [`README.ja.md`](README.ja.md) |
+| Documentation | [`docs/`](docs/) | [`docs/ja/`](docs/ja/) |
+| Skills | [`skills/`](skills/) | [`i18n/ja/skills/`](i18n/ja/skills/) |
 
-## 開発・検証コマンド
+Japanese skills are opt-in with `--skills-dir i18n/ja/skills`. Keep the procedure and checklist order aligned between locales, and update each locale's output-format cases when its template changes. Skill headings are fixed by that edition's output contract; write the response body in the user's language.
 
-リポジトリのルートから実行します。
+## Project and code map
+
+Actor-si is a local-first CLI, HTTP API, web UI, and resident bot that loads `SKILL.md` instructions and can call the Gemini API. The core uses only Python's standard library. The Google SDK backend is optional; the built-in simulator supports offline development.
+
+- CLI and packaging: `actor/cli.py`, `pyproject.toml`
+- HTTP API and browser UI: `actor/server.py`, `actor/web/`
+- Chat and provider backends: `actor/chat.py`, `actor/providers.py`
+- Skill loading and prompt composition: `actor/skills.py`, `actor/prompt.py`
+- Portable ZIP lint and export: `actor/portable.py`
+- Output-format contract tests: `actor/skill_tests.py`
+- Shared English principles: `skills/_house/principles.md`
+- Shared Japanese principles: `i18n/ja/skills/_house/principles.md`
+
+For task-specific details, see [`docs/bot.md`](docs/bot.md), [`docs/keys.md`](docs/keys.md), [`docs/skills-compat.md`](docs/skills-compat.md), and [`docs/agensi.md`](docs/agensi.md).
+
+## Development checks
+
+Run from the repository root:
 
 ```sh
-# API キー不要の標準テスト
+# Full standard-library test suite
 python -m unittest discover -s tests -q
 
-# SKILL.md の出力形式と tests/cases.yaml の静的整合性を確認
-python -m actor skills test
-
-# 実際のモデル応答まで検査する（API キーが必要。課金の可能性あり）
-python -m actor skills test --live
-
-# portable lint と単一スキル ZIP の作成
+# English default skills
 python -m actor skills lint --target agensi
-python -m actor skills export minutes-writer --target agensi -o minutes-writer.zip
+python -m actor skills test
+python -m actor skills export minutes-writer --target agensi -o /tmp/minutes-writer.zip
 
-# 起動時チェックとローカルサーバー
+# Japanese skills; pass the locale directory explicitly
+python -m actor skills --skills-dir i18n/ja/skills lint --target agensi
+python -m actor skills --skills-dir i18n/ja/skills test
+python -m actor skills --skills-dir i18n/ja/skills export minutes-writer --target agensi -o /tmp/minutes-writer-ja.zip
+
+# Environment diagnostics
 python -m actor doctor
-python -m actor serve --port 8080
 ```
 
-2026-10-25時点の点検では unittest **206件成功 / 11件 skip**、形式テスト5スキル成功、Agensi lint 5スキル成功、トークン保護サーバーを使った UI smoke が成功しました。PR CI は Python 3.9 / 3.11 / 3.13、SDK、bot、skill-packaging、認証付き UI smoke のジョブを実行します。pip wheel の内容も確認し、`actor/resources/principles.md` と `actor/resources/LICENSE` が含まれることを検証しました。テスト件数は追加・変更で変わるため、上のコマンドで再確認してください。
+The default skill tests are format-only: they inspect output templates and assertions without calling a model. `--live` sends prompts to the configured provider and may incur charges. The optional UI smoke test requires Node and `jsdom`; its CI job uses a newly generated temporary room token. Do not check fixed tokens or provider credentials into source, test fixtures, logs, or documentation.
 
-## セキュリティ上の挙動
+## Security and operations
 
-- `/api/` の `POST` / `PUT` / `DELETE` は `Content-Type: application/json` を必須とします。
-- 変更系 API の Origin は same-origin または `ACTOR_CORS_ORIGINS` の明示 allowlist のみ許可します。それ以外は 403。Origin のない非ブラウザ・サーバー間リクエストは許可されますが、JSON 要件とトークン設定は引き続き適用されます。
-- トークンは `X-Actor-Token` / `X-Room-Token` / `Authorization: Bearer` で送ります。URL query の `token` は認証に使いません。
-- CSP の `frame-ancestors` は `'self'` に制限しています。外部公開する場合はルームトークンを設定し、Host / CORS allowlist も環境に合わせて構成してください。
-- キーやトークンをソース、ログ、fixture、HANDOFF に書かないでください。`.env` や `.actor/` の実データはコミットしないこと。
+- API `POST`, `PUT`, and `DELETE` mutations require `Content-Type: application/json`.
+- Mutating browser requests accept same-origin requests or origins explicitly listed in `ACTOR_CORS_ORIGINS`. Requests without an `Origin` header are permitted for non-browser clients, subject to JSON requirements and any configured token.
+- Room tokens are accepted through `X-Actor-Token`, `X-Room-Token`, or `Authorization: Bearer`; query-string tokens are not accepted.
+- Content Security Policy restricts `frame-ancestors` to `'self'`. Set a room token before exposing the server beyond loopback, and configure host/origin allowlists for the deployment.
+- Keep runtime data in ignored `.actor/` files or a local secret store. Do not commit credentials, private account data, or personal email addresses.
 
-## portable Agent Skills の仕様
+## Portable skill packages
 
-- Export は一度に1スキルを `<name>/SKILL.md` の形式で ZIP 化します。
-- ZIP は同一入力から再現可能になるよう固定 timestamp で作成します。HTML コメントは `SKILL.md` から除去されます。
-- 共通の `principles.md` と MIT `LICENSE` を必須で同梱します。ソースツリーだけでなく pip 配布内の `actor/resources/` にもリソースを置き、欠落時は export を止めます。
-- Lint は原文ではなく実際に作る ZIP の内容を検査します。Google `AIza…`、GitHub `ghp_…` 等の credential、秘密裏の送信・実行指示、危険コマンド、環境情報収集、難読化、外部 URL、形式・容量などを検査します。
-- テキスト以外の参照、隠しファイル、cache、`tests/` は ZIP に含めません。除外された参照は lint の警告として確認してください。Lint は保守的な近似であり、安全性や掲載審査の合格を保証しません。ZIP を手動で確認してください。
-- 提出や外部アカウント操作は Actor の対象外です。作者が自分で内容を確認し、手動で行います。
+- Export one skill per ZIP with `<name>/SKILL.md` at the package root.
+- ZIPs are reproducible for identical inputs. HTML comments are removed from prose but preserved inside fenced and indented code examples.
+- `principles.md` and the MIT `LICENSE` are required in the source and packaged resources; tests verify the canonical and packaged copies stay synchronized.
+- Lint checks the same archive variant selected for export. If using `--keep-allowed-tools`, pass it to both lint and export.
+- Lint is a conservative approximation, not a safety guarantee or marketplace approval. Review the complete ZIP and warnings manually.
+- Binary references, hidden files, caches, tests, and dependencies are excluded. Actor does not submit skills or operate external accounts.
 
-## スキル出力形式テスト
+## Release and change constraints
 
-`skills/<name>/tests/cases.yaml` は JSON 構文（YAML 1.2互換）のケース定義です。`assert_contains` は出力形式に必須の見出しを列挙します。`<会議名>` のような山括弧付きのテンプレート表記は、実際の出力で値が入るプレースホルダーとして照合されます。
-
-- `python -m actor skills test` は `# 出力フォーマット` のコード例と明示参照されたテンプレートから見出しを取得し、期待見出しの不足・古いassertを検査します。これは**形式の検査のみ**で、モデル出力を生成しません。結果の `output` は `null` です。
-- `--live` はケース入力を設定済みモデルへ送り、実際の応答を見出しassertと照合します。モデル呼び出しによる課金に注意してください。
-- 出力形式を変更したら対応する `tests/cases.yaml` も同じ変更で更新し、両モードの意味を混同しないでください。
-
-## 次回リリース
-
-- セキュリティ修正を含む `v0.2.1` のバージョンとリリースノートは準備済みです。リリースノート: [`docs/release-notes-v0.2.1.md`](docs/release-notes-v0.2.1.md)。
-- 変更を `main` に統合してから、`v0.2.1` タグと GitHub Release を作成してください。作成前に同名タグ / Release が存在しないことを確認します。現時点では未作成です。
-- 公開済み `v0.2.0` タグ / Release は維持し、過去のタグや公開履歴を書き換えないでください。
-
-## 継続時の注意・変更制約
-
-- 公開済み Git 履歴の書き換えや force-push は破壊的です。明示的な承認なしに実施しないでください。
-- `examples/mika` は今回の点検・更新対象外です。明示的な依頼なしに変更しないでください。
-- `LISTING.md` はホスト実機での互換性を確認できていない旨を記載しています。各エージェントを実機検証するまでは、対応済みと追記しないでください。
-- GitHub About description と Topics は更新を試みましたが、GitHub integration が HTTP 403 を返したため未変更です。権限があるオーナーが GitHub の repository settings から手動更新してください。
-- `docs/development-handoff.md` は2026-10-13時点のアーカイブです。旧コマンド・数値を現行情報として参照しないでください。
+- The security fixes from PR #5 are merged. PR #6 adds the English source edition and opt-in Japanese localization; it does not change the release version.
+- The next prepared version is `v0.2.1`; its release notes are in [`docs/release-notes-v0.2.1.md`](docs/release-notes-v0.2.1.md). Before publishing, confirm the changes are on `main` and the tag/release does not already exist.
+- Preserve the published `v0.2.0` tag and release. Do not rewrite published history or force-push.
+- Do not modify `examples/mika` unless explicitly asked.
+- [`LISTING.md`](LISTING.md) is a draft and has not been verified against live third-party hosts. Do not claim host compatibility until tested.
+- Repository About/Topics could not be changed due to an integration permission error; an authorized owner would need to update them manually.
