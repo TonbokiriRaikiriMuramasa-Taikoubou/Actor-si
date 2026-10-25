@@ -551,6 +551,7 @@ node tests/ui_smoke.mjs
 
 ## 参考
 
+- [支援について](FUNDING.md) — GitHub Sponsors の扱い、支援金の用途、プロジェクトの方針
 - Google 公式ブログ: *Let skills in Gemini tackle your most repetitive tasks*（2026-09-30）
 - Google Workspace Updates: *Introducing skills in the Gemini app and Workspace, plus what's next for Gems*（2026-09-30）
 - [SKILL.md 互換メモ](docs/skills-compat.md)
