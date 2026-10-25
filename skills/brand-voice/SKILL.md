@@ -1,6 +1,6 @@
 ---
 name: brand-voice
-description: Revises user-provided copy to match a calm, consistent brand voice while preserving meaning and facts. Use when polishing announcements, emails, release notes, or other external-facing text.
+description: Revises user-provided copy to match a calm, consistent brand voice while preserving meaning and facts. Use when polishing announcements, emails, release notes, or other external-facing text. Do not use when the user needs fact-checking or new copy without source material.
 license: MIT
 metadata:
   version: "1.0.0"

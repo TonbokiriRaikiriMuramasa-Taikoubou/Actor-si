@@ -1,6 +1,6 @@
 ---
 name: minutes-writer
-description: Turns meeting transcripts or notes into structured minutes with decisions, action items, owners, due dates, and open questions. Use when the user provides meeting material and asks for minutes.
+description: Turns meeting transcripts or notes into structured minutes with decisions, action items, owners, due dates, and open questions. Use when the user provides meeting material and asks for minutes. Do not use when the user wants a general summary rather than meeting decisions and follow-ups.
 license: MIT
 metadata:
   version: "1.0.0"

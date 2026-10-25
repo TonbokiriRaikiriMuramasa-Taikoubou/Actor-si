@@ -186,6 +186,10 @@ def _portable_files(skill: Skill, keep_allowed_tools: bool = False) -> tuple[dic
         components = relative.split("/")
         if any(part.startswith(".") or part in {"__pycache__", "tests"} for part in components):
             continue
+        # The canonical project LICENSE is always bundled below; a source copy
+        # at the skill root is neither needed nor an omitted portable reference.
+        if relative == "LICENSE":
+            continue
         if ref.kind != "text":
             skipped.append(relative)
             continue
@@ -245,10 +249,11 @@ _PROMPT_INJECTION = (
     r"(?i)(?:secretly|silently|covertly)\s+(?:send|upload|exfiltrate|execute|run)",
     r"(?i)(?:send|upload|exfiltrate|execute|run)\b.{0,80}\bwithout (?:telling|notifying|informing) (?:the )?user",
     r"(?:前の|以前の)指示を無視",
-    r"(?:ユーザーに伝えない|ユーザーには知らせずに|ユーザーに知らせずに|ユーザーに黙って|秘密裏に(?:送信|実行)|こっそり(?:送信|実行)|知らせずに送信|隠して(?:実行|送信|おく))",
+    r"(?:ユーザーに伝えない|ユーザーには知らせずに|ユーザーに知らせずに|ユーザーに黙って|秘密裏に(?:送信|実行)|こっそり(?:送信|実行)|知らせずに送信|隠して(?:実行|送信))",
     r"(?i)\b(?:without (?:the user's )?knowledge|without consent|undisclosed|under the radar)\b",
     r"(?i)\b(?:silently|secretly|covertly)\s+(?:upload|transmit|exfiltrate|execute|run)",
-    r"(?:ユーザーに)?(?:知らせないで|伝えないで|通知しないで|報告しないで)",
+    r"ユーザー(?:に|には)(?:知らせない|伝えない|通知しない|報告しない|知らせず|伝えず|通知せず|報告せず|黙って|隠す|隠して|秘密にする)",
+    r"(?:知らせないで|伝えないで|通知しないで|報告しないで|知らせずに|伝えずに|通知せずに|報告せず(?:に)?).{0,40}(?:送信|アップロード|実行|起動)",
     r"(?:黙って|無断で|秘密裏に|こっそり)(?:アップロード|送信|実行|実行する|起動)",
     r"(?:報告|通知|連絡)せず(?:に)?(?:実行|アップロード|送信|実行する)",
 )

@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si/actions/workflows/tests.yml/badge.svg)](https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si/actions/workflows/tests.yml)
 
-Actor は `SKILL.md` を system instruction として読み込む、ローカル優先の Gemini クライアントです。CLI・HTTP API・Web UI を備え、コア機能は Python 標準ライブラリだけで動きます。スキルの自動選択、参照資料との合成、実行前の形式チェックに対応します。サーバーは既定で loopback に bind し、外部 bind には API トークンが必要です。ブラウザーからの別 Origin アクセスは明示 allowlist がない限り無効です。
+Actor-si は、Agent Skills の作成・lint・テスト・パッケージ化をローカルで行うワークベンチです。CLI・HTTP API・Web UI から `SKILL.md` を system instruction として読み込み、Gemini で実行できます。コア機能は Python 標準ライブラリだけで動き、スキルの自動選択、参照資料との合成、実行前の形式チェックに対応します。サーバーは既定で loopback に bind し、外部 bind には API トークンが必要です。ブラウザーからの別 Origin アクセスは明示 allowlist がない限り無効です。
 
 ## 概要
 
@@ -31,6 +31,39 @@ Actor はその形式のフォルダをそのまま読み込み、
 ```
 
 ---
+
+## 利用できること
+
+Actor-si は、Agent Skills をローカルで作成・lint・テストし、ZIP 化するためのワークショップです。ホスト型マーケットプレイスや自動提出サービスではありません。再利用できるスキルを5つ同梱しています。各英語スキルの description には `Use when` と `Do not use when` の境界を記載しています。互換形式のホストで使えますが、第三者ホストでの動作は個別に検証していません。
+
+### 自分のスキルを作成・検証する
+
+`/skill-author` と会話して再利用可能な `SKILL.md` を下書きし、実際にエクスポートされる ZIP をローカルで検査します。
+
+```bash
+python3 -m actor skills lint --target agensi
+python3 -m actor skills test
+```
+
+lint は ZIP の配置、メタデータ、ファイル種別・サイズ、資格情報の漏えいらしき文字列、危険な隠蔽・プロンプトインジェクション指示などを確認します。`skills test` は必須の出力見出しとテストケースをモデル呼び出しなしで検査します。`--live` を指定した場合のみ設定済みプロバイダーを使います。
+
+```bash
+python3 -m actor skills export minutes-writer --target agensi -o minutes-writer.zip
+```
+
+エクスポートは共有 principles と正規の MIT `LICENSE` を含む、再現可能なスキル単体 ZIP を作ります。ZIP 全体を確認し、提出先を選んで自分で提出してください。Actor がアップロード・公開・提出を行うことはありません。
+
+### 同梱の5つのスキル
+
+- **`skill-author`** — メタデータ、手順、参照資料、テスト可能な出力形式を備えた `SKILL.md` を設計します。再利用手順の作成・改善向けで、単発の回答には不要です。
+- **`release-notes`** — 提供されたコミット、PR、変更一覧からユーザー向けリリースノートを作ります。固定の全見出しを使い、空欄は `None` とします。実際の変更一覧がない場合やコミットメッセージ作成には使いません。
+- **`code-review`** — 提供された差分や PR の不具合・セキュリティリスクを重大度順に報告し、最小限の修正案を示します。問題がなければ `LGTM` のみを返します。実装や一般的なコード説明には使いません。
+- **`minutes-writer`** — 文字起こしやメモから決定事項、アクション、担当、期限、未解決点を含む議事録を作ります。日本語版は `i18n/ja/skills` にあります。会議記録用であり、一般的な要約向けではありません。
+- **`brand-voice`** — ユーザーが提供した文章を、事実と意味を保ちながら落ち着いた一貫性のある文体に整えます。既存文章の推敲向けで、事実確認や根拠のない新規事実の作成には使いません。
+
+### 提供しないもの
+
+Actor-si はホスト型サービスではありません。同梱スキル自体が外部システムを操作したり、コンテンツを提出したりすることもありません。ユーザーが提供した材料をもとにテキストを作成・支援します。Actor の任意ネットワークツールは既定で無効で、使う場合も明示的な有効化が必要です。外部サービスを直接操作するスキルは同梱していません。
 
 ## 30秒で試す
 
@@ -251,7 +284,7 @@ python3 -m actor rooms say "この図を見て" --attach ./図.png --reply   # �
 
 ## Portable Agent Skills / Agensi
 
-`actor skills lint --target agensi` でローカル検査し、`actor skills export <name> --target agensi -o <name>.zip` で1スキル単位のZIPを作れます。Lintは公開スキャナーの近似で、審査通過を保証しません。提出・アカウント操作は行わず、ZIPを確認したうえで作者が手動で提出してください。詳細は [docs/agensi.md](docs/ja/agensi.md) と [docs/skills-compat.md](docs/ja/skills-compat.md)、変更履歴は [CHANGELOG.md](CHANGELOG.md)、[v0.2.1 セキュリティ修正リリースノート](docs/ja/release-notes-v0.2.1.md)、[v0.2.0 リリースノート](docs/ja/release-notes-v0.2.0.md) を参照してください。
+Agensi 向けエクスポートプロファイル、lint の制約、portable な `SKILL.md` の互換性は [docs/agensi.md](docs/ja/agensi.md) と [docs/skills-compat.md](docs/ja/skills-compat.md) を参照してください。Lint は保守的な近似であり、審査通過を保証しません。変更履歴は [CHANGELOG.md](CHANGELOG.md)、[v0.2.1 セキュリティ修正リリースノート](docs/ja/release-notes-v0.2.1.md)、[v0.2.0 リリースノート](docs/ja/release-notes-v0.2.0.md) を参照してください。
 
 ## ルームのトークン保護と Webhook
 

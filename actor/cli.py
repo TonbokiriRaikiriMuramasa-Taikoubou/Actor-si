@@ -147,11 +147,10 @@ def build_parser() -> argparse.ArgumentParser:
                       help="Attach images, PDFs, or other files (repeatable)")
     chat.add_argument("--no-banner", action="store_true")
 
-    # `actor skills [list|show|new|rm|export|path] [name...]`
     # Use positional arguments instead of nested subcommands to allow options in any order.
     skills = sub.add_parser("skills", help="Manage skills")
     add_common_options(skills)
-    skills.add_argument("args", nargs="*", help="[list|show|new|rm|export|path] [name...]")
+    skills.add_argument("args", nargs="*", help="[list|show|new|rm|export|lint|test|path] [name...]")
     skills.add_argument("--description", default="", help="Description for new")
     skills.add_argument("--body", help="Read the new skill body from a file")
     skills.add_argument("--overwrite", action="store_true", help="Overwrite an existing skill with new")

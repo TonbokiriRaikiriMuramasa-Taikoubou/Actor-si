@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: Reviews code changes for actionable defects and security risks, then reports findings by severity. Use when the user asks for a code, diff, or pull-request review.
+description: Reviews code changes for actionable defects and security risks, then reports findings by severity. Use when the user asks for a code, diff, or pull-request review. Do not use when the user wants implementation or a general explanation without changes to inspect.
 license: MIT
 metadata:
   version: "1.0.0"

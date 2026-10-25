@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si/actions/workflows/tests.yml/badge.svg)](https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si/actions/workflows/tests.yml)
 
-Actor is a local-first Gemini client that loads `SKILL.md` folders as system instructions. It provides a CLI, HTTP API, and web UI, using Python's standard library for its core features. Skills can be selected automatically, composed with references, and checked before use. The server binds to loopback by default; external binding requires an API token, and browser cross-origin access requires an explicit allowlist.
+Actor-si is a local-first workbench for authoring, linting, testing, and packaging portable Agent Skills. Its CLI, HTTP API, and web UI load `SKILL.md` folders as system instructions and run them with Gemini; core features use Python's standard library. Skills can be selected automatically, composed with references, and checked before use. The server binds to loopback by default; external binding requires an API token, and browser cross-origin access requires an explicit allowlist.
 
 ## Overview
 
@@ -23,6 +23,41 @@ Actor loads folders that follow the open, Markdown-native Agent Skills `SKILL.md
 │ HTTP API   │──┘     select / compose     │ + references │
 └────────────┘                             └──────────────┘
 ```
+
+## What you can use it for
+
+Actor-si is a local workshop for drafting, linting, testing, and packaging portable Agent Skills—not a hosted marketplace or submission service. It also includes five reusable skills for common writing and review tasks. Their descriptions state both `Use when` and `Do not use when` boundaries; use them in Actor or export their folders as ZIPs for compatible hosts. Third-party host compatibility has not been independently verified.
+
+### Build and check your own skills
+
+Draft a reusable `SKILL.md` in a conversation with `/skill-author`, then lint the exact portable package locally:
+
+```bash
+python3 -m actor skills lint --target agensi
+python3 -m actor skills test
+```
+
+Lint checks the ZIP Actor would export, including folder layout, metadata, supported file types and sizes, likely leaked credentials, and risky concealment or prompt-injection instructions. `skills test` checks required output headings and cases without calling a model; `--live` is an opt-in exception that uses the configured provider.
+
+Export one reproducible ZIP per skill when it is ready:
+
+```bash
+python3 -m actor skills export minutes-writer --target agensi -o minutes-writer.zip
+```
+
+The ZIP includes the canonical MIT `LICENSE` and shared principles. Review the complete archive, then submit it yourself on any service you choose; Actor does not upload, publish, or submit skills.
+
+### Use the five bundled skills
+
+- **`skill-author`** — Drafts a complete, portable `SKILL.md`, including metadata, actionable steps, references, and a testable output format. Use it to create or improve reusable procedures; not for a one-off answer that does not need a skill.
+- **`release-notes`** — Turns supplied commits, pull requests, or change lists into user-facing release notes. It keeps the required sections and marks empty ones `None`; use it when preparing notes from actual changes, not to invent changes or write commit messages.
+- **`code-review`** — Reviews a supplied diff or pull request for actionable defects and security risks, ranked by severity, with minimal fixes. A clean review returns `LGTM`; use it for review, not implementation or a general code explanation.
+- **`minutes-writer`** — Turns transcripts or notes into structured minutes with decisions, actions, owners, deadlines, and open questions. A separate Japanese edition is available in `i18n/ja/skills`; use it for meeting records, not a generic summary.
+- **`brand-voice`** — Polishes user-provided copy in a calm, consistent voice while preserving facts and meaning. Use it to revise existing copy, not to fact-check or create unsupported facts.
+
+### What it is not
+
+Actor-si is not a hosted service, and these bundled skills do not directly act on external systems or submit content. They produce or guide text based on material you provide. Actor's optional network tool is disabled by default and must be explicitly enabled. If you need a skill that operates an external service, this bundle does not provide that integration.
 
 ## 30-second quickstart
 
@@ -139,7 +174,7 @@ The web UI accepts attachments through its paperclip button. The HTTP API accept
 
 ## Portable Agent Skills / Agensi
 
-Run `actor skills lint --target agensi` to check skills locally and `actor skills export <name> --target agensi -o <name>.zip` to create a one-skill ZIP. Linting is a conservative approximation, not a guarantee of acceptance. Actor does not submit packages or operate an Agensi account; review the ZIP and submit it yourself. See the [Agensi workflow](docs/agensi.md) and [SKILL.md compatibility notes](docs/skills-compat.md).
+For the Agensi-specific export profile, lint limitations, and portable `SKILL.md` compatibility details, see the [Agensi workflow](docs/agensi.md) and [compatibility notes](docs/skills-compat.md). Lint is a conservative approximation, not a guarantee of acceptance.
 
 ## Protect rooms with tokens and webhooks
 

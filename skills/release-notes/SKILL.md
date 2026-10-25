@@ -1,6 +1,6 @@
 ---
 name: release-notes
-description: Turns commits, pull requests, or change lists into concise release notes for users. Use when preparing a release announcement or changelog entry from supplied changes.
+description: Turns commits, pull requests, or change lists into concise release notes for users. Use when preparing a release announcement or changelog entry from supplied changes. Do not use when the user wants commit messages or has not supplied change records.
 license: MIT
 metadata:
   version: "1.0.0"

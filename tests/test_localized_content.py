@@ -93,6 +93,7 @@ class LocalizedContentTest(unittest.TestCase):
             self.assertIsNotNone(description)
             value = description.group(1)
             self.assertIn("Use when", value)
+            self.assertIn("Do not use when", value)
             self.assertGreaterEqual(len(re.findall(r"[.!?](?:\s|$)", value)), 1)
             self.assertLessEqual(len(re.findall(r"[.!?](?:\s|$)", value)), 3)
 

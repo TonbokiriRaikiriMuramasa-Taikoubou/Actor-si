@@ -1,6 +1,6 @@
 # Actor-si maintainer handoff
 
-Last reviewed: 2026-10-25
+Last reviewed: 2026-10-26
 
 Repository: <https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si>
 
@@ -68,6 +68,7 @@ The default skill tests are format-only: they inspect output templates and asser
 - Room tokens are accepted through `X-Actor-Token`, `X-Room-Token`, or `Authorization: Bearer`; query-string tokens are not accepted.
 - Content Security Policy restricts `frame-ancestors` to `'self'`. Set a room token before exposing the server beyond loopback, and configure host/origin allowlists for the deployment.
 - Keep runtime data in ignored `.actor/` files or a local secret store. Do not commit credentials, private account data, or personal email addresses.
+- Use GitHub's noreply address for authored commits. GitHub-generated merge commits may reflect the account's email-privacy setting, which only an authorized account owner can change. Do not rewrite merged history to alter attribution.
 
 ## Portable skill packages
 
@@ -76,13 +77,16 @@ The default skill tests are format-only: they inspect output templates and asser
 - `principles.md` and the MIT `LICENSE` are required in the source and packaged resources; tests verify the canonical and packaged copies stay synchronized.
 - Lint checks the same archive variant selected for export. If using `--keep-allowed-tools`, pass it to both lint and export.
 - Lint is a conservative approximation, not a safety guarantee or marketplace approval. Review the complete ZIP and warnings manually.
-- Binary references, hidden files, caches, tests, and dependencies are excluded. Actor does not submit skills or operate external accounts.
+- Binary references, hidden files, caches, tests, and dependencies are excluded. A root source `LICENSE` is replaced by the canonical bundled MIT license, so it is not an omitted-reference warning. Actor does not submit skills or operate external accounts.
+- English bundled skill descriptions state both `Use when` and `Do not use when`; keep that boundary in the description of new English skills. Japanese skill files are maintained separately.
 
 ## Release and change constraints
 
-- The security fixes from PR #5 are merged. PR #6 adds the English source edition and opt-in Japanese localization; it does not change the release version.
-- The next prepared version is `v0.2.1`; its release notes are in [`docs/release-notes-v0.2.1.md`](docs/release-notes-v0.2.1.md). Before publishing, confirm the changes are on `main` and the tag/release does not already exist.
+- PR #5 contains the merged security fixes. PR #6 added the English source edition and opt-in Japanese localization; PR #7 translated the CLI and UI chrome. All three are merged.
+- Release notes for `v0.2.1` are prepared in [`docs/release-notes-v0.2.1.md`](docs/release-notes-v0.2.1.md), but the tag and GitHub Release have not been created. Do not create them without explicit maintainer approval. Before publishing, confirm the release changes are on `main` and the tag/release does not already exist.
 - Preserve the published `v0.2.0` tag and release. Do not rewrite published history or force-push.
 - Do not modify `examples/mika` unless explicitly asked.
+- Keep Sponsors links in `FUNDING.md`; do not add them to `LISTING.md` or skill ZIPs.
+- Do not submit packages to third-party services or change GitHub settings without explicit authorization.
 - [`LISTING.md`](LISTING.md) is a draft and has not been verified against live third-party hosts. Do not claim host compatibility until tested.
-- Repository About/Topics could not be changed due to an integration permission error; an authorized owner would need to update them manually.
+- Repository About/Topics could not be changed due to an integration permission error; do not retry without updated authorization.

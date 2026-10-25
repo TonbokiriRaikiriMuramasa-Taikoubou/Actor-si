@@ -1223,6 +1223,16 @@ class CliArgTest(unittest.TestCase):
         args = build_parser().parse_args(_split_command(["rooms", "say", "こんにちは", "--reply"]))
         self.assertTrue(args.reply)
 
+    def test_skills_help_lists_lint_and_test(self):
+        import io
+        from contextlib import redirect_stdout
+        from actor.cli import build_parser
+
+        output = io.StringIO()
+        with redirect_stdout(output), self.assertRaises(SystemExit):
+            build_parser().parse_args(["skills", "--help"])
+        self.assertIn("[list|show|new|rm|export|lint|test|path]", output.getvalue())
+
     def test_parser_accepts_each_command(self):
         from actor.cli import build_parser, _split_command
 
