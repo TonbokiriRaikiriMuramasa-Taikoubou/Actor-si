@@ -22,4 +22,4 @@ Other agents use their own skill directories and may support different metadata 
 
 ## Test cases
 
-`skills/<name>/tests/cases.yaml` uses JSON syntax (valid YAML 1.2) and lives outside the export package; Actor excludes test folders from reference loading as well. `python -m actor skills test` runs deterministic simulator fixtures; `--live` sends the case prompts to the configured model and may incur API charges. The fixtures are contract scaffolding, not a substitute for human quality review.
+`skills/<name>/tests/cases.yaml` uses JSON syntax (valid YAML 1.2) and lives outside the export package; Actor excludes test folders from reference loading as well. `python -m actor skills test` checks only that the asserted headings match the static output-format specification; it does not call a model or generate sample output. Use `--live` to send case prompts to the configured model and verify its actual response headings; live calls may incur API charges. Neither mode replaces human quality review.

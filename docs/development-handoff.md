@@ -1,6 +1,6 @@
 # Development handoff snapshot — Actor（2026-10-13）
 
-> Historical notes retained from the supplied archive. They describe an earlier self-use setup and are not current security guidance; consult `README.md`, `SECURITY.md`, and the current docs for present behavior.
+> Historical notes retained from the supplied archive. They describe an earlier self-use setup and are not current security guidance. For the current repository state and validation steps, use the root [`HANDOFF.md`](../HANDOFF.md), `README.md`, `SECURITY.md`, and current docs.
 
 引き継ぎ用のサマリです。**いまどこまで出来ていて、どう動かして、次に何をすると良いか**を、
 README より少し踏み込んで書いています（コマンドはそのままコピペで動きます）。
@@ -55,8 +55,8 @@ README より少し踏み込んで書いています（コマンドはそのま�
 ## 3. クイックスタート（手元のマシンで）
 
 ```bash
-git clone https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor.git
-cd Actor
+git clone https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si.git
+cd Actor-si
 
 # 1) API キーを入れる（3つのどれでも。優先度: --api-key > 環境変数 > .env > .actor/api_key）
 cp .env.example .env && vi .env          # GEMINI_API_KEY=AIza...

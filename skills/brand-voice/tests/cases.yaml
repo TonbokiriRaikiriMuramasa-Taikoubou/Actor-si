@@ -1,12 +1,10 @@
 [
   {
-    "skill": "brand-voice",
-    "name": "preserve meaning",
-    "input": "Polish this announcement while preserving its facts.",
-    "simulation_output": "Revised copy\nChanges made",
+    "name": "preserve meaning and output sections",
+    "input": "整えてください。元文: 新機能を公開します。利用可能日は2026-11-01です。引用: ‘毎日確認します’。意味と事実は維持し、整えた文章と変更点を出してください。",
     "assert_contains": [
-      "Revised copy",
-      "Changes made"
+      "## 整えた文章",
+      "## 変更点（最大7件）"
     ]
   }
 ]

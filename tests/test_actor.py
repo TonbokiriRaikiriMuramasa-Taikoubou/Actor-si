@@ -792,7 +792,7 @@ class ServerTest(unittest.TestCase):
         status, updated = self.post("/api/select", {"message": "temp-skill の手順で"})
         self.assertIn("temp-skill", [s["name"] for s in updated["skills"]])
 
-        request = urllib.request.Request(self.url("/api/skills/temp-skill"), method="DELETE")
+        request = urllib.request.Request(self.url("/api/skills/temp-skill"), headers={"Content-Type": "application/json"}, method="DELETE")
         with urllib.request.urlopen(request, timeout=10) as response:
             self.assertEqual(response.status, 200)
 
@@ -869,7 +869,7 @@ class ServerTest(unittest.TestCase):
         status, missing = self.get("/api/rooms/nope")
         self.assertEqual(status, 404)
 
-        request = urllib.request.Request(self.url("/api/rooms/api-room"), method="DELETE")
+        request = urllib.request.Request(self.url("/api/rooms/api-room"), headers={"Content-Type": "application/json"}, method="DELETE")
         with urllib.request.urlopen(request, timeout=10) as response:
             self.assertEqual(response.status, 200)
 
@@ -880,7 +880,7 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(fetched["session"]["title"], "T")
         status, listing = self.get("/api/sessions")
         self.assertTrue(any(s["id"] == session_id for s in listing["sessions"]))
-        request = urllib.request.Request(self.url(f"/api/sessions/{session_id}"), method="DELETE")
+        request = urllib.request.Request(self.url(f"/api/sessions/{session_id}"), headers={"Content-Type": "application/json"}, method="DELETE")
         with urllib.request.urlopen(request, timeout=10) as response:
             self.assertEqual(response.status, 200)
 
@@ -1598,7 +1598,9 @@ class RoomAuthTest(unittest.TestCase):
 
         status, _ = self._call("/api/rooms/auth-room?after=0")
         self.assertEqual(status, 403)
-        status, payload = self._call("/api/rooms/auth-room?after=0&token=s3cret")
+        status, _ = self._call("/api/rooms/auth-room?after=0&token=s3cret")
+        self.assertEqual(status, 403)
+        status, payload = self._call("/api/rooms/auth-room?after=0", token="s3cret")
         self.assertEqual(status, 200)
         self.assertEqual(payload["messages"][0]["text"], "やあ")
 

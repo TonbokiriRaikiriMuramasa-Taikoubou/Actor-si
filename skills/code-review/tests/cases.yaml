@@ -1,12 +1,10 @@
 [
   {
-    "skill": "code-review",
-    "name": "review severity",
-    "input": "Review this change for defects and return findings by severity.",
-    "simulation_output": "## Findings\n## Severity\n## Fixes",
+    "name": "review findings sections",
+    "input": "Review this change. The code contains a clear null-pointer bug; report it by severity, with conclusion and findings sections.",
     "assert_contains": [
-      "## Findings",
-      "## Severity"
+      "## 結論",
+      "## 指摘"
     ]
   }
 ]

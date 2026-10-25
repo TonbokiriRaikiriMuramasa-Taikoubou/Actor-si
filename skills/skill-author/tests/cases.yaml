@@ -1,13 +1,15 @@
 [
   {
-    "skill": "skill-author",
-    "name": "complete skill file",
-    "input": "Create a reusable skill with a clear output format.",
-    "simulation_output": "---\nname: example-skill\ndescription: Example. Use when needed.\n---\n# Purpose",
+    "name": "complete reusable skill template",
+    "input": "再利用可能な会議要約スキルを作成してください。Agent Skills形式で、出力形式と5つの基本見出しを含む完全なSKILL.mdを返してください。",
     "assert_contains": [
-      "name:",
-      "description:",
-      "# Purpose"
+      "## 設計メモ",
+      "## SKILL.md",
+      "# 目的",
+      "# 入力",
+      "# 手順",
+      "# 出力フォーマット",
+      "# 確認事項"
     ]
   }
 ]
