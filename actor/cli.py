@@ -159,7 +159,7 @@ def build_parser() -> argparse.ArgumentParser:
     skills.add_argument("--json", action="store_true", dest="as_json", help="show を JSON で出力")
     skills.add_argument("-o", "--output", help="export の出力先")
     skills.add_argument("--target", choices=("gemini", "portable", "agensi"), default="gemini", help="export/lint の形式")
-    skills.add_argument("--keep-allowed-tools", action="store_true", help="portable export でも allowed-tools を保持")
+    skills.add_argument("--keep-allowed-tools", action="store_true", help="portable lint/export に allowed-tools を含める")
     skills.add_argument("--force", action="store_true", help="lint Fail の場合も書き出す（要確認）")
     skills.add_argument("--live", action="store_true", help="skills test で実 API を利用する（課金対象）")
 
@@ -754,7 +754,8 @@ def cmd_skills(args: argparse.Namespace) -> int:
 
     if sub == "lint":
         from .portable import lint_skills
-        reports = lint_skills(library.resolve(names)[0] if names else library.all())
+        reports = lint_skills(library.resolve(names)[0] if names else library.all(),
+                              keep_allowed_tools=args.keep_allowed_tools)
         payload = [report.to_dict() for report in reports]
         if args.as_json:
             print(json.dumps(payload, ensure_ascii=False, indent=2))

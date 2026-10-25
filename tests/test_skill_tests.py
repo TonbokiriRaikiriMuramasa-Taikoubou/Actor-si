@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch
 
 from actor.config import load_settings
-from actor.skill_tests import run_cases
+from actor.skill_tests import _assertion_matches, run_cases
 from actor.skills import SkillLibrary
 
 
@@ -19,6 +19,13 @@ class SkillOutputContractTest(unittest.TestCase):
             self.assertEqual(case["check_type"], "format-only")
             self.assertIsNone(case["output"])
             self.assertIn("形式の検査のみ", case["message"])
+
+    def test_angle_bracket_heading_placeholders_match_concrete_output(self):
+        self.assertTrue(_assertion_matches("# 週次会議 議事録", "# <会議名> 議事録"))
+        self.assertTrue(_assertion_matches("# Sprint Review 議事録", "# <会議名> 議事録"))
+        self.assertFalse(_assertion_matches("# 議事録", "# <会議名> 議事録"))
+        self.assertFalse(_assertion_matches("# Sprint Review\\n議事録", "# <会議名> 議事録"))
+        self.assertTrue(_assertion_matches("### [High] Null guard missing", "### [High] <1行で内容>"))
 
     def test_assertions_must_match_format_spec(self):
         with patch("actor.skill_tests._load_cases", return_value=[{

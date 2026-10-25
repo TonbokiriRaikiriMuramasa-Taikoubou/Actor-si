@@ -42,7 +42,7 @@ python -m actor doctor
 python -m actor serve --port 8080
 ```
 
-2026-10-25時点の点検では unittest **201件成功 / 11件 skip**、形式テスト5スキル成功、Agensi lint 5スキル成功でした。PR CI は Python 3.9 / 3.11 / 3.13、SDK、bot、skill-packaging のジョブを実行します。pip wheel の内容も確認し、`actor/resources/principles.md` と `actor/resources/LICENSE` が含まれることを検証しました。テスト件数は追加・変更で変わるため、上のコマンドで再確認してください。
+2026-10-25時点の点検では unittest **206件成功 / 11件 skip**、形式テスト5スキル成功、Agensi lint 5スキル成功、トークン保護サーバーを使った UI smoke が成功しました。PR CI は Python 3.9 / 3.11 / 3.13、SDK、bot、skill-packaging、認証付き UI smoke のジョブを実行します。pip wheel の内容も確認し、`actor/resources/principles.md` と `actor/resources/LICENSE` が含まれることを検証しました。テスト件数は追加・変更で変わるため、上のコマンドで再確認してください。
 
 ## セキュリティ上の挙動
 
@@ -71,7 +71,7 @@ python -m actor serve --port 8080
 
 ## 継続時の注意・未完了項目
 
-- 公開済み `v0.2.0` タグ / Release は現状のままです。新しい変更を過去のReleaseに含めた扱いにせず、タグ付けやRelease作成は別途判断してください。
+- 公開済み `v0.2.0` タグ / Release は現状のままにします。今回の修正は `v0.2.1` のセキュリティ修正リリースとして準備し、変更が main に統合された後に新しいタグ / Release を作成します。過去のタグや公開履歴は書き換えないでください。
 - 公開済み Git 履歴の書き換えや force-push は破壊的です。明示的な承認なしに実施しないでください。
 - `examples/mika` は今回の点検・更新対象外です。明示的な依頼なしに変更しないでください。
 - `LISTING.md` はホスト実機での互換性を確認できていない旨を記載しています。各エージェントを実機検証するまでは、対応済みと追記しないでください。
