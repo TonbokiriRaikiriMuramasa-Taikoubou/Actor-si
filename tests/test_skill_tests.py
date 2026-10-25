@@ -19,7 +19,7 @@ class SkillOutputContractTest(unittest.TestCase):
         for case in result["cases"]:
             self.assertEqual(case["check_type"], "format-only")
             self.assertIsNone(case["output"])
-            self.assertIn("形式の検査のみ", case["message"])
+            self.assertIn("Format-only check", case["message"])
 
     def test_default_english_skill_directory_passes_format_checks(self):
         result = run_cases(self.library)

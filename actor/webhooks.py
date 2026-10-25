@@ -114,7 +114,7 @@ class WebhookDispatcher:
                 with urllib.request.urlopen(request, timeout=self.timeout) as response:
                     response.read(1024)
                 self.stats["sent"] += 1
-                self._log(f"送信しました event={payload.get('event')} ({response.status})")
+                self._log(f"Sent event={payload.get('event')} ({response.status})")
                 return
             except urllib.error.HTTPError as exc:
                 if exc.code < 500 and exc.code != 429:
@@ -123,7 +123,7 @@ class WebhookDispatcher:
                 pass
             time.sleep(min(4.0, 0.5 * (2 ** attempt)))
         self.stats["failed"] += 1
-        self._log(f"送信に失敗しました event={payload.get('event')} url={self.url}")
+        self._log(f"Failed to send event={payload.get('event')} url={self.url}")
 
     def _log(self, message: str) -> None:
         if self.on_log:

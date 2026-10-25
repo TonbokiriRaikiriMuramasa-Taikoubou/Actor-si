@@ -215,7 +215,7 @@ class GeminiProvider(Provider):
                     "kind": "model_fallback",
                     "from": chain[0],
                     "to": ready[0],
-                    "text": f"{chain[0]} は全キーが 429 のため {ready[0]} で試します",
+                    "text": f"{chain[0]} has all keys rate-limited; trying {ready[0]} instead.",
                 })
                 chain = ready + rest
         return chain, notices
@@ -261,15 +261,15 @@ class GeminiProvider(Provider):
                     retry_after=parse_retry_delay(_safe_json(body)),
                 )
             except urllib.error.URLError as exc:
-                error = ProviderError(f"ネットワークエラー: {redact(str(exc.reason), self.keys.keys)}")
+                error = ProviderError(f"Network error: {redact(str(exc.reason), self.keys.keys)}")
             except TimeoutError:  # pragma: no cover - 実環境依存
-                error = ProviderError("タイムアウトしました")
+                error = ProviderError("Request timed out.")
             if self.settings.key_rotate and error.status in ROTATE_STATUSES:
                 return None, error            # キーを替えた方が早い（同じキーで粘らない）
             if not error.retryable or attempt == self.MAX_RETRIES - 1:
                 return None, error
             time.sleep(min(4.0, 0.8 * (2 ** attempt)))
-        return None, error or ProviderError("リクエストに失敗しました")
+        return None, error or ProviderError("Request failed.")
 
     def _open(self, build_url: "Callable[[str], str]", payload: dict[str, Any] | None = None,
               *, override: str | None = None) -> tuple[Any, str, list[dict[str, Any]]]:
@@ -282,7 +282,7 @@ class GeminiProvider(Provider):
         models, notices = self._model_order(override)
         if not pool.size and not self.settings.api_key:
             raise ProviderError(
-                "API キーが設定されていません（`actor key set` か .env の GEMINI_API_KEY=...）"
+                "No API key configured. Use `actor key set` or set GEMINI_API_KEY in .env."
             )
         error: ProviderError | None = None
         for model in models:
@@ -312,10 +312,10 @@ class GeminiProvider(Provider):
                     "kind": "model_fallback",
                     "from": model,
                     "to": next_model,
-                    "text": f"{model} で全キーが 429 → {next_model} に逃がします",
+                    "text": f"{model} has all keys rate-limited; falling back to {next_model} instead.",
                 })
         if error is None:  # pragma: no cover - ロジック上ほぼ起きない
-            raise ProviderError("リクエストに失敗しました")
+            raise ProviderError("Request failed.")
         if error.status in ROTATE_STATUSES and pool.size:
             raise ProviderError(
                 pool.exhaustion_message(status=error.status, last_error=error, models=models),
@@ -337,7 +337,7 @@ class GeminiProvider(Provider):
         current = self._model(model)
         contents = to_gemini_contents(messages)
         if not contents:
-            raise ProviderError("送信するメッセージがありません")
+            raise ProviderError("No messages to send.")
         payload: dict[str, Any] = {
             "contents": contents,
             "generationConfig": generation_config or self.settings.generation_config(),
@@ -371,7 +371,7 @@ class GeminiProvider(Provider):
         requested = self._model(model)
         contents = to_gemini_contents(messages)
         if not contents:
-            raise ProviderError("送信するメッセージがありません")
+            raise ProviderError("No messages to send.")
         payload: dict[str, Any] = {
             "contents": contents,
             "generationConfig": generation_config or self.settings.generation_config(),
@@ -505,7 +505,7 @@ class MockProvider(Provider):
             return {
                 "text": "",
                 "thoughts": thoughts + "\n" + "\n".join(
-                    f"ツール `{c['name']}` を呼び出します: {c['args']}" for c in calls
+                    f"Calling tool `{c['name']}` with arguments: {c['args']}" for c in calls
                 ),
                 "function_calls": calls,
                 "model": f"{self._model(kwargs.get('model'))} (simulation)",
@@ -564,7 +564,7 @@ class MockProvider(Provider):
             "provider": self.name,
             "model": self.model,
             "mock": True,
-            "note": "GEMINI_API_KEY 未設定のためシミュレータで動作中",
+            "note": "Simulation mode: GEMINI_API_KEY is not set",
         }
 
     def _plan_tool_calls(
@@ -596,16 +596,16 @@ class MockProvider(Provider):
 
     # ---- 内部 ----
     def _thoughts(self, skills: list[dict[str, Any]], user_text: str) -> str:
-        lines = ["依頼内容を解析しています。"]
+        lines = ["Analyzing the request."]
         if skills:
-            lines.append("適用中のスキル: " + ", ".join(s["name"] for s in skills))
+            lines.append("Active skills: " + ", ".join(s["name"] for s in skills))
             for skill in skills:
                 steps = _extract_steps(skill["instructions"])
                 if steps:
-                    lines.append(f"`{skill['name']}` の手順を {len(steps)} ステップ検出しました。")
+                    lines.append(f"`{skill['name']}`: {len(steps)} procedure step(s) detected.")
         else:
-            lines.append("適用中のスキルはありません。通常の回答を生成します。")
-        lines.append(f"入力は {len(user_text)} 文字。出力形式をスキル定義から決定します。")
+            lines.append("No skills are active; generating a general response.")
+        lines.append(f"Input length: {len(user_text)} characters. Selecting the output format from the skill instructions.")
         return "\n".join(lines)
 
     def _compose(self, skills: list[dict[str, Any]], user_text: str, messages: Sequence[dict[str, Any]]) -> str:
@@ -613,13 +613,13 @@ class MockProvider(Provider):
         tool_notes = _tool_results_in(messages)
         out: list[str] = []
         out.append(
-            "> ⚠️ **シミュレーションモード**：`GEMINI_API_KEY` が未設定のため、"
-            "実モデルではなく Actor 内蔵のルールベース応答を返しています。"
-            "`.env` にキーを入れて再起動すると、そのまま本物の Gemini に切り替わります。"
+            "> ⚠️ **Simulation mode**: `GEMINI_API_KEY` is not set, so "
+            "Actor is returning a rule-based preview instead of a live model response. "
+            "Set the key in `.env` and restart the server to switch to a live Gemini model."
         )
         out.append("")
         if tool_notes:
-            out.append("### ツールの実行結果")
+            out.append("### Tool results")
             out.append("")
             for name, result in tool_notes:
                 out.append(f"**`{name}`**")
@@ -630,7 +630,7 @@ class MockProvider(Provider):
                 out.append("")
         if skills:
             names = " ".join(f"`{s['name']}`" for s in skills)
-            out.append(f"### 適用スキル\n{names}")
+            out.append(f"### Applied skills\n{names}")
             out.append("")
             for skill in skills:
                 steps = _extract_steps(skill["instructions"])
@@ -638,28 +638,28 @@ class MockProvider(Provider):
                     out.append(f"**{skill['name']}** — {skill['description']}")
                 if steps:
                     out.append("")
-                    out.append("実行した手順:")
+                    out.append("Procedure steps:")
                     for i, step in enumerate(steps[:8], 1):
                         mark = "x" if i < len(steps) else " "
                         out.append(f"{i}. {step}")
                 out.append("")
-            out.append("### 成果物（ドラフト）")
+            out.append("### Draft output")
             out.append("")
             out.append(self._deliverable(skills, user_text, turn))
         else:
-            out.append("### 回答")
+            out.append("### Response")
             out.append("")
             out.append(
-                "スキルが選択されていないため、一般的な応答を返します。"
-                f"受け取った内容は次のとおりです。\n\n> {_first_lines(user_text, 6)}"
+                "No skills were selected, so this is a general response."
+                f"Here is the content you provided.\n\n> {_first_lines(user_text, 6)}"
             )
             out.append("")
-            out.append("左のスキル一覧から `/スキル名` で明示的に呼び出すか、メッセージに作業内容を詳しく書くと自動選択されます。")
+            out.append("Select a skill from the list on the left or describe the task in more detail to trigger automatic selection.")
         out.append("")
         out.append("---")
         out.append(
-            f"*turn {turn} / skills: {len(skills)} / これは Actor の動作確認用の応答です。"
-            "API キーを設定すると実際の Gemini 応答になります。*"
+            f"*turn {turn} / skills: {len(skills)} / This is a preview from Actor. "
+            "Configure an API key to get responses from Gemini.*"
         )
         return "\n".join(out)
 
@@ -667,16 +667,16 @@ class MockProvider(Provider):
         """スキルが定義した出力フォーマットと、入力の要点を突き合わせて提示する。"""
         primary = skills[0]
         template = _extract_template(primary["instructions"])
-        origin = "SKILL.md の出力フォーマット"
+        origin = "SKILL.md output format"
         if not template:
             ref_path, ref_template = _extract_reference_template(primary.get("references_text", ""))
             if ref_template:
-                template, origin = ref_template, f"参照資料 `{ref_path}`"
-        topic = _first_lines(user_text, 1) or "（入力なし）"
-        lines: list[str] = [f"**対象**: {topic}", ""]
+                template, origin = ref_template, f"reference `{ref_path}`"
+        topic = _first_lines(user_text, 1) or "(No input provided)"
+        lines: list[str] = [f"**Request**: {topic}", ""]
 
         if template:
-            lines.append(f"{origin}（実モデル接続時はここが埋まります）:")
+            lines.append(f"{origin} (the live model fills in this template):")
             lines.append("")
             lines.append("```markdown")
             lines.append(template.strip())
@@ -685,20 +685,20 @@ class MockProvider(Provider):
         else:
             for heading in _extract_headings(primary["instructions"])[:6]:
                 lines.append(f"#### {heading}")
-                lines.append(f"- {topic} について、`{primary['name']}` の観点で整理した項目がここに入ります。")
+                lines.append(f"- {topic} from the perspective of `{primary['name']}`.")
                 lines.append("")
 
         points = [line.strip("・-* \t") for line in user_text.splitlines() if line.strip()]
-        lines.append("#### 入力から読み取れた要点")
+        lines.append("#### Key points from the input")
         if points:
             for point in points[:5]:
                 lines.append(f"- {point[:120]}")
         else:
-            lines.append("- （入力なし）")
+            lines.append("- (No input provided)")
         lines.append("")
         lines.append(
-            f"※ これは `{primary['name']}` の手順と出力形式を実際に読み取って組み立てた"
-            f"プレビューです（{turn} ターン目）。API キーを設定すると、この形式で実モデルが中身を生成します。"
+            f"Note: This preview was assembled by reading the procedure and output format for `{primary['name']}`. "
+            f"Turn {turn}. Configure an API key for a live model to fill in this format."
         )
         return "\n".join(lines)
 
@@ -727,8 +727,8 @@ def get_provider(settings: Settings | None = None, name: str | None = None) -> P
             import sys
 
             print(
-                "警告: google-genai SDK が見つからないため urllib 実装で続行します"
-                "（`pip install google-genai` で SDK を使えます）",
+                "Warning: google-genai SDK not found; continuing with the urllib implementation"
+                " (install google-genai with `pip install google-genai`)",
                 file=sys.stderr,
             )
             return GeminiProvider(settings)
@@ -740,7 +740,7 @@ def get_provider(settings: Settings | None = None, name: str | None = None) -> P
             return MockProvider(settings)
         configured = (os.environ.get("ACTOR_GEMINI_IMPL") or "gemini").lower()
         return get_provider(settings, configured)
-    raise ValueError(f"未知のプロバイダ: {requested}")
+    raise ValueError(f"Unknown provider: {requested}")
 
 
 def _chunks(text: str, size: int) -> Iterator[str]:
@@ -779,11 +779,11 @@ def _extract_skills(system_text: str) -> list[dict[str, Any]]:
     for match in re.finditer(r'<skill name="([^"]+)">(.*?)</skill>', system_text, re.S):
         name, block = match.group(1), match.group(2)
         description = ""
-        desc_match = re.search(r"^概要: (.+)$", block, re.M)
+        desc_match = re.search(r"^(?:Description|概要): (.+)$", block, re.M)
         if desc_match:
             description = desc_match.group(1).strip()
-        block = re.sub(r"^概要: .+$", "", block, count=1, flags=re.M)
-        parts = re.split(r"^## 参照資料（スキルに同梱）$", block, flags=re.M)
+        block = re.sub(r"^(?:Description|概要): .+$", "", block, count=1, flags=re.M)
+        parts = re.split(r"^## (?:Reference materials \(included with this skill\)|参照資料（スキルに同梱）)$", block, flags=re.M)
         instructions = parts[0].strip()
         references_text = parts[1].strip() if len(parts) > 1 else ""
         skills.append({
@@ -802,7 +802,7 @@ def _extract_reference_template(references_text: str) -> tuple[str, str]:
     さらに内側のコードブロック（= 実際のテンプレート）を優先する。
     """
     best: tuple[str, str] = ("", "")
-    for block in re.split(r"^### 参照: ", references_text, flags=re.M)[1:]:
+    for block in re.split(r"^### (?:Reference: |参照: )", references_text, flags=re.M)[1:]:
         path, _, rest = block.partition("\n")
         outer = fenced_blocks(rest)
         if not outer:

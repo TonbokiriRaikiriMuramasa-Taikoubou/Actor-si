@@ -147,7 +147,7 @@ class SkillLibraryTest(unittest.TestCase):
 
     def test_instruction_block_includes_reference_with_nested_fence(self):
         block = self.lib.get("minutes").instruction_block()
-        self.assertIn("## 参照資料（スキルに同梱）", block)
+        self.assertIn("## Reference materials (included with this skill)", block)
         self.assertIn("references/format.md", block)
         # ネストしたフェンスより長いフェンスで囲まれている
         self.assertIn("````", block)
@@ -222,14 +222,14 @@ class PromptTest(unittest.TestCase):
     def test_compose_includes_all_skills_in_order(self):
         text = compose_system_text(self.lib.all(), preamble="前置き")
         self.assertIn("前置き", text)
-        self.assertIn('適用中のスキル: a, b', text)
+        self.assertIn('Active skills: a, b', text)
         self.assertLess(text.index("<skill name=\"a\">"), text.index("<skill name=\"b\">"))
 
     def test_catalog_lists_others(self):
         text = compose_system_text([self.lib.get("a")], preamble="p", all_skills=self.lib.all(), with_catalog=True)
-        self.assertIn("## 利用できるスキル（カタログ）", text)
+        self.assertIn("## Available skills", text)
         self.assertIn("`b`", text)
-        self.assertNotIn("- `a`:", text.split("カタログ")[1])
+        self.assertNotIn("- `a`:", text.split("## Available skills")[1])
 
     def test_build_returns_parts(self):
         obj = build_system_instruction([self.lib.get("a")], preamble="p")
@@ -239,7 +239,7 @@ class PromptTest(unittest.TestCase):
 
     def test_no_skills(self):
         text = compose_system_text([], preamble="p")
-        self.assertIn("適用中のスキル: なし", text)
+        self.assertIn("Active skills: none", text)
 
     def test_estimate_tokens_monotonic(self):
         self.assertLess(estimate_tokens("短い"), estimate_tokens("ずっと長いテキストです" * 10))
@@ -395,7 +395,7 @@ class ChatEngineTest(unittest.TestCase):
     def test_draft_skill_from_request(self):
         draft = self.engine.draft_skill("週次レポートを作る weekly report")
         self.assertTrue(draft.name)
-        self.assertIn("# 手順", draft.instructions)
+        self.assertIn("# Procedure", draft.instructions)
 
     def test_parse_draft_handles_code_fence_and_garbage(self):
         good = parse_draft('```json\n{"name":"My Skill","description":"d","instructions":"# 手順\\n1. x"}\n```')
@@ -694,7 +694,7 @@ class BotTest(unittest.TestCase):
 
         payload = self.client.messages("tool-room", after=0)
         reply = [m for m in payload["messages"] if m["role"] == "assistant"][-1]
-        self.assertIn("ツールの実行結果", reply["text"])
+        self.assertIn("Tool results", reply["text"])
         self.assertIn("now", reply["tools"])
 
     def test_bot_persists_cursor(self):
@@ -806,7 +806,7 @@ class ServerTest(unittest.TestCase):
     def test_chat_and_sse_stream(self):
         status, data = self.post("/api/chat", {"message": "議事録を作って"})
         self.assertEqual(status, 200)
-        self.assertIn("シミュレーションモード", data["text"])
+        self.assertIn("Simulation mode", data["text"])
         self.assertEqual(data["skills"], ["minutes"])
         self.assertTrue(data["session_id"])
 
@@ -1333,7 +1333,7 @@ class ToolRegistryTest(unittest.TestCase):
 
         result = ToolRegistry.build(["now"]).execute("nope", {})
         self.assertFalse(result.ok)
-        self.assertIn("使えません", result.error)
+        self.assertIn("not available", result.error)
 
     def test_declarations_shape(self):
         from actor.tools import ToolRegistry
@@ -1584,7 +1584,7 @@ class RoomAuthTest(unittest.TestCase):
     def test_write_requires_token(self):
         status, body = self._call("/api/rooms", {"name": "locked-room"})
         self.assertEqual(status, 403)
-        self.assertIn("トークン", body["error"])
+        self.assertIn("API token", body["error"])
 
         status, _ = self._call("/api/rooms", {"name": "locked-room"}, token="s3cret")
         self.assertEqual(status, 201)
@@ -1860,8 +1860,8 @@ class ApiKeyApiTest(unittest.TestCase):
         self.assertNotIn("fixture-UIKEY1234567890abcd", json.dumps(config))
 
     def test_invalid_keys_are_rejected(self):
-        for bad, hint in [("", "必須"), ("fixture- with space 1234567890", "空白"),
-                          ("short", "短すぎ"), ("x" * 19, "短すぎ")]:
+        for bad, hint in [("", "required"), ("fixture- with space 1234567890", "whitespace"),
+                          ("short", "too short"), ("x" * 19, "too short")]:
             with self.subTest(key=bad[:12]):
                 status, body = self.call("POST", "/api/key", {"api_key": bad})
                 self.assertEqual(status, 400)
@@ -1920,7 +1920,7 @@ class ApiKeyCliTest(unittest.TestCase):
             data_dir = Path(tmp.name) / ".actor"
             shown = self.run_cli(["key", "show"], data_dir)
             self.assertEqual(shown.returncode, 0, shown.stderr)
-            self.assertIn("未設定", shown.stdout)
+            self.assertIn("not configured", shown.stdout)
 
             saved = self.run_cli(["key", "set", "--stdin"], data_dir, stdin="fixture-CLIKEY1234567890\n")
             self.assertEqual(saved.returncode, 0, saved.stderr)
@@ -1932,7 +1932,7 @@ class ApiKeyCliTest(unittest.TestCase):
 
             cleared = self.run_cli(["key", "clear"], data_dir)
             self.assertEqual(cleared.returncode, 0, cleared.stderr)
-            self.assertIn("削除しました", cleared.stdout)
+            self.assertIn("Removed", cleared.stdout)
             self.assertFalse((data_dir / "api_key").exists())
 
             bad = self.run_cli(["key", "set", "--stdin"], data_dir, stdin="has space in it 1234567890\n")
@@ -2145,7 +2145,7 @@ class KeyPoolTest(unittest.TestCase):
         for key in keys:
             pool.mark_limited(key, status=429, reason=f"429 Quota exceeded for {key}")
         message = pool.exhaustion_message(status=429, last_error=ProviderError("429 Quota exceeded"))
-        self.assertIn("すべての Gemini API キーが使えません", message)
+        self.assertIn("No Gemini API keys are currently available", message)
         self.assertIn("fixtur…7890", message)
         self.assertIn("actor key add", message)
         for key in keys:
@@ -2184,7 +2184,7 @@ class KeyPoolTest(unittest.TestCase):
         from actor.keys import mask_key, redact, split_keys
 
         self.assertEqual(mask_key("fixture-SyABCDEFGHIJ"), "fixtur…GHIJ")
-        self.assertEqual(mask_key("short"), "＊＊＊＊＊")
+        self.assertEqual(mask_key("short"), "*****")
         text = redact("Quota exceeded for fixture-SyABCDEFGHIJ please retry", ["fixture-SyABCDEFGHIJ"])
         self.assertNotIn("fixture-SyABCDEFGHIJ", text)
         self.assertIn("fixtur…GHIJ", text)
@@ -2259,7 +2259,7 @@ class KeyRotationTest(unittest.TestCase):
             self.call(settings)
         message = str(ctx.exception)
         self.assertEqual(ctx.exception.status, 429)
-        self.assertIn("すべての Gemini API キーが使えません", message)
+        self.assertIn("No Gemini API keys are currently available", message)
         self.assertIn("actor key list", message)
         for key in keys:
             self.assertNotIn(key, message)      # API 本文に混ざったキーも伏せる
@@ -2288,7 +2288,7 @@ class KeyRotationTest(unittest.TestCase):
         events = list(get_provider(settings).stream([{"role": "user", "content": "やあ"}]))
         errors = [e for e in events if e["type"] == "error"]
         self.assertTrue(errors)
-        self.assertIn("すべての Gemini API キーが使えません", errors[0]["text"])
+        self.assertIn("No Gemini API keys are currently available", errors[0]["text"])
 
     def test_network_error_does_not_burn_keys(self):
         keys = ["fixture-AAAA_1234567890", "fixture-BBBB_1234567890"]
@@ -2306,7 +2306,7 @@ class KeyRotationTest(unittest.TestCase):
         _FakeRotatingGemini.limited = set(keys)
         with self.assertRaises(ProviderError) as ctx:
             self.call(settings)
-        self.assertIn("すべての Gemini API キーが使えません（1 本すべて", str(ctx.exception))
+        self.assertIn("No Gemini API keys are currently available (1 total", str(ctx.exception))
         self.assertEqual(_FakeRotatingGemini.seen, [keys[0]])   # 無駄な再試行をしない
 
     def test_health_reports_key_pool(self):
@@ -2375,7 +2375,7 @@ class GenAiKeyRotationTest(unittest.TestCase):
         provider = GenAiProvider(settings)
         with self.assertRaises(ProviderError) as ctx:
             provider.generate([{"role": "user", "content": "やあ"}])
-        self.assertIn("すべての Gemini API キーが使えません", str(ctx.exception))
+        self.assertIn("No Gemini API keys are currently available", str(ctx.exception))
         for key in keys:
             self.assertNotIn(key, str(ctx.exception))
 
@@ -2421,7 +2421,7 @@ class KeyCliTest(unittest.TestCase):
 
         added = self.run_cli(["key", "add", "--stdin"], stdin=f"{first}\n")
         self.assertEqual(added.returncode, 0, added.stderr)
-        self.assertIn("追加しました", added.stdout)
+        self.assertIn("Added:", added.stdout)
         self.assertIn(".actor/keys/key-1.key", added.stdout.replace(str(self.data), ".actor"))
         self.assertNotIn(first, added.stdout)          # 生のキーは出さない
 
@@ -2430,7 +2430,7 @@ class KeyCliTest(unittest.TestCase):
 
         listing = self.run_cli(["key", "list"])
         self.assertEqual(listing.returncode, 0, listing.stderr)
-        self.assertIn("API キー 2 本", listing.stdout)
+        self.assertIn("API key(s): 2", listing.stdout)
         self.assertIn("fixtur…7890", listing.stdout)
         self.assertNotIn(first, listing.stdout)
 
@@ -2443,18 +2443,18 @@ class KeyCliTest(unittest.TestCase):
         # 同じキーは増やさない
         duplicate = self.run_cli(["key", "add", "--stdin"], stdin=f"{first}\n")
         self.assertEqual(duplicate.returncode, 0, duplicate.stderr)
-        self.assertIn("既に登録されています", duplicate.stdout)
+        self.assertIn("already registered", duplicate.stdout)
         self.assertEqual(json.loads(self.run_cli(["key", "list", "--json"]).stdout)["count"], 2)
 
         # 短すぎるキーは拒否
         too_short = self.run_cli(["key", "add", "--stdin"], stdin="shorty\n")
         self.assertEqual(too_short.returncode, 2)
-        self.assertIn("短すぎ", too_short.stdout)
+        self.assertIn("too short", too_short.stdout)
 
         # 1 本だけ消す
         removed = self.run_cli(["key", "rm", "0"])
         self.assertEqual(removed.returncode, 0, removed.stderr)
-        self.assertIn("削除しました", removed.stdout)
+        self.assertIn("Deleted:", removed.stdout)
         self.assertFalse((self.data / "keys" / "key-1.key").exists())
         self.assertEqual(json.loads(self.run_cli(["key", "list", "--json"]).stdout)["count"], 1)
 
@@ -2465,10 +2465,10 @@ class KeyCliTest(unittest.TestCase):
         self.run_cli(["key", "set", "--stdin"], stdin="fixture-CLISET1_1234567890\n")
         cleared = self.run_cli(["key", "clear"])
         self.assertEqual(cleared.returncode, 0, cleared.stderr)
-        self.assertIn("削除しました", cleared.stdout)
+        self.assertIn("Removed", cleared.stdout)
         self.assertFalse((self.data / "api_key").exists())
         self.assertFalse((self.data / "keys" / "key-2.key").exists())
-        self.assertIn("未設定", self.run_cli(["key", "show"]).stdout)
+        self.assertIn("not configured", self.run_cli(["key", "show"]).stdout)
 
     def test_env_keys_are_listed_and_not_deletable(self):
         env = {"GEMINI_API_KEYS": "fixture-ENVONE_1234567890,fixture-ENVTWO_1234567890"}
@@ -2481,12 +2481,12 @@ class KeyCliTest(unittest.TestCase):
 
         shown = self.run_cli(["key", "show"], extra_env=env)
         self.assertIn("fixtur…7890", shown.stdout)
-        self.assertIn("キー 2 本", shown.stdout)
+        self.assertIn("2 keys", shown.stdout)
 
         # 環境変数のキーは削除できない（どこを直すか案内する）
         refused = self.run_cli(["key", "rm", "0"], extra_env=env)
         self.assertEqual(refused.returncode, 1)
-        self.assertIn("環境変数", refused.stdout)
+        self.assertIn("environment variable", refused.stdout)
 
     def test_check_reports_each_key(self):
         keys = ["fixture-CHK1_1234567890", "fixture-CHK2_1234567890"]
@@ -2495,8 +2495,8 @@ class KeyCliTest(unittest.TestCase):
             extra_env={"GEMINI_API_KEYS": ",".join(keys)},
         )
         self.assertEqual(checked.returncode, 0, checked.stderr)
-        self.assertIn("API キーの接続確認", checked.stdout)
-        self.assertIn("2/2 本が応答しました", checked.stdout)
+        self.assertIn("API key connectivity check", checked.stdout)
+        self.assertIn("2/2 key(s) responded", checked.stdout)
         self.assertNotIn(keys[0], checked.stdout)
 
         # 1 本だけ 429 のときは、そのキーだけ✗になる
@@ -2519,7 +2519,7 @@ class KeyCliTest(unittest.TestCase):
     def test_unknown_action_is_reported(self):
         result = self.run_cli(["key", "lst"])
         self.assertEqual(result.returncode, 2)
-        self.assertIn("不明な操作", result.stdout)
+        self.assertIn("Unknown action", result.stdout)
 
 
 class KeyRotationChatTest(unittest.TestCase):
@@ -2568,7 +2568,7 @@ class KeyRotationChatTest(unittest.TestCase):
         session = engine.store.create()
         events = list(engine.turn(session, "やあ", auto=False, stream=False))
         done = next(e for e in events if e["type"] == "done")
-        self.assertIn("すべての Gemini API キーが使えません", done["error"])
+        self.assertIn("No Gemini API keys are currently available", done["error"])
         self.assertNotIn(self.keys[0], done["error"])
 
 
@@ -2776,7 +2776,7 @@ class KeyStatsCliTest(unittest.TestCase):
 
         added = self.run_cli(["key", "add", "--env", "--stdin", "--env-file", str(env_path)], stdin=f"{key}\n")
         self.assertEqual(added.returncode, 0, added.stderr)
-        self.assertIn("追加しました", added.stdout)
+        self.assertIn("Added:", added.stdout)
         self.assertNotIn(key, added.stdout)                     # 生のキーは出さない
         text = env_path.read_text(encoding="utf-8")
         self.assertIn(f"export GEMINI_API_KEYS=fixture-FIRST_1234567890,{key}", text)
@@ -2803,9 +2803,9 @@ class KeyStatsCliTest(unittest.TestCase):
 
         stats = self.run_cli(["key", "stats"], extra_env=env)
         self.assertEqual(stats.returncode, 0, stats.stderr)
-        self.assertIn("API キーの利用統計", stats.stdout)
-        self.assertIn("429 で切れた 1 回", stats.stdout)
-        self.assertIn("よく切れているキー", stats.stdout)
+        self.assertIn("API key usage statistics", stats.stdout)
+        self.assertIn("1 rate limits", stats.stdout)
+        self.assertIn("Most rate-limited keys", stats.stdout)
         self.assertIn("fixtur…7890", stats.stdout)
         for key in keys:
             self.assertNotIn(key, stats.stdout)
@@ -2819,15 +2819,15 @@ class KeyStatsCliTest(unittest.TestCase):
 
         # doctor / key list にも数字が出る
         doctor = self.run_cli(["doctor"], extra_env=env)
-        self.assertIn("キーの統計", doctor.stdout)
-        self.assertIn("429 で切れた 1 回", doctor.stdout)
+        self.assertIn("actor key stats", doctor.stdout)
+        self.assertIn("1 rate limits", doctor.stdout)
         listing = self.run_cli(["key", "list"], extra_env=env)
-        self.assertIn("429 で切り替えた回数: 1", listing.stdout)
+        self.assertIn("Total rate limits: 1", listing.stdout)
 
         # リセットすると消える
         reset = self.run_cli(["key", "stats", "--reset"], extra_env=env)
         self.assertEqual(reset.returncode, 0, reset.stderr)
-        self.assertIn("リセットしました", reset.stdout)
+        self.assertIn("Reset statistics", reset.stdout)
         after = json.loads(self.run_cli(["key", "stats", "--json"], extra_env=env).stdout)
         self.assertEqual(after["totals"]["limits"], 0)
         self.assertEqual(after["keys"][0]["limits"], 0)
@@ -2835,7 +2835,7 @@ class KeyStatsCliTest(unittest.TestCase):
     def test_stats_without_keys_is_safe(self):
         result = self.run_cli(["key", "stats"])
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("未設定", result.stdout)
+        self.assertIn("not configured", result.stdout)
 
 
 
@@ -2978,8 +2978,8 @@ class ModelFallbackTest(unittest.TestCase):
             self.assertFalse(pool.is_ready(key, "gemini-3.8-flash"))    # 主モデルは全キー制限中
             self.assertTrue(pool.is_ready(key, "gemini-3.5-flash"))     # 逃げ道なら同じキーで使える
         self.assertTrue(pool.is_ready(fallback_key, "gemini-3.5-flash"))
-        self.assertEqual(pool.summary("gemini-3.5-flash"), "2/2 本が使用可能")
-        self.assertEqual(pool.summary("gemini-3.8-flash"), "0/2 本が使用可能")
+        self.assertEqual(pool.summary("gemini-3.5-flash"), "2/2 key(s) ready")
+        self.assertEqual(pool.summary("gemini-3.8-flash"), "0/2 key(s) ready")
 
     def test_next_turn_skips_exhausted_model(self):
         """制限中と分かっている主モデルは、次のターンでは最初から試さない。"""
@@ -2992,7 +2992,7 @@ class ModelFallbackTest(unittest.TestCase):
         self.assertEqual(result["model"], "gemini-3.5-flash")
         notices = [n for n in result["notices"] if n.get("to") == "gemini-3.5-flash"]
         self.assertTrue(notices)
-        self.assertIn("全キーが 429", notices[0]["text"])
+        self.assertIn("has all keys rate-limited", notices[0]["text"])
 
     def test_stream_notifies_and_uses_new_model(self):
         _FakeModelGemini.limited_models = {"gemini-3.8-flash"}
@@ -3014,7 +3014,7 @@ class ModelFallbackTest(unittest.TestCase):
             provider.generate([{"role": "user", "content": "やあ"}])
         message = str(ctx.exception)
         self.assertEqual(ctx.exception.status, 429)
-        self.assertIn("試したモデル: gemini-3.8-flash / gemini-3.5-flash / gemini-2.5-flash", message)
+        self.assertIn("tried models: gemini-3.8-flash / gemini-3.5-flash / gemini-2.5-flash", message)
         self.assertIn("ACTOR_MODEL_FALLBACKS", message)          # 対処が書いてある
         self.assertIn("actor key sources", message)              # キーの入手先も案内する
         for key in self.keys:
@@ -3239,7 +3239,7 @@ class KeySourcesTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("https://aistudio.google.com/apikey", result.stdout)
         self.assertIn("aiplatform.googleapis.com", result.stdout)
-        self.assertIn("規約違反", result.stdout)
+        self.assertIn("violates the terms", result.stdout)
 
         payload = json.loads(self.run_cli(["key", "sources", "--json"]).stdout)
         self.assertTrue(any("aistudio" in item["url"] for item in payload["sources"]))
@@ -3327,8 +3327,8 @@ class KeyCliModelTest(unittest.TestCase):
         result = self.run_cli(["--no-banner", "--no-model-fallback", "やあ"],
                               {"GEMINI_API_KEY": "fixture-CLIFB3_1234567890"})
         self.assertEqual(result.returncode, 1)
-        self.assertIn("すべての Gemini API キーが使えません", result.stdout)
-        self.assertIn("試したモデル: gemini-3.8-flash", result.stdout)
+        self.assertIn("No Gemini API keys are currently available", result.stdout)
+        self.assertIn("tried models: gemini-3.8-flash", result.stdout)
         self.assertNotIn("gemini-3.5-flash\t", "".join(f"{m}\t" for m, _k in _FakeModelGemini.seen))
 
     def test_stats_show_model_sections(self):
@@ -3337,18 +3337,18 @@ class KeyCliModelTest(unittest.TestCase):
         self.run_cli(["--no-banner", "やあ"], env)
         stats = self.run_cli(["key", "stats"], env)
         self.assertEqual(stats.returncode, 0, stats.stderr)
-        self.assertIn("モデル別", stats.stdout)
+        self.assertIn("By model", stats.stdout)
         self.assertIn("gemini-3.8-flash", stats.stdout)
-        self.assertIn("いちばん切れているモデル: gemini-3.8-flash", stats.stdout)
-        self.assertIn("このモデルが切れたら自動で逃げます: gemini-3.5-flash", stats.stdout)
+        self.assertIn("Most rate-limited model: gemini-3.8-flash", stats.stdout)
+        self.assertIn("Fallbacks for this model: gemini-3.5-flash", stats.stdout)
 
         listing = self.run_cli(["key", "list"], env)
-        self.assertIn("モデルごとの空き", listing.stdout)
-        self.assertIn("逃げ道: gemini-3.5-flash, gemini-2.5-flash", listing.stdout)
+        self.assertIn("Available keys by model", listing.stdout)
+        self.assertIn("fallback models: gemini-3.5-flash, gemini-2.5-flash", listing.stdout)
 
         doctor = self.run_cli(["doctor"], env)
-        self.assertIn("モデルの逃げ道", doctor.stdout)
-        self.assertIn("切れやすいモデル : gemini-3.8-flash", doctor.stdout)
+        self.assertIn("Model fallbacks", doctor.stdout)
+        self.assertIn("Most rate-limited models: gemini-3.8-flash", doctor.stdout)
 
 
 if __name__ == "__main__":

@@ -61,7 +61,7 @@ const check = (label, ok, extra = '') => {
 for (let i = 0; i < 60 && $$('#skill-list li').length === 0; i++) await wait(100);
 
 check('起動: スキル一覧が描画される', $$('#skill-list li').length >= 5, `${$$('#skill-list li').length} 件`);
-check('起動: プロバイダ表示', /シミュレータ|Gemini/.test($('#provider-pill').textContent), $('#provider-pill').textContent);
+check('起動: プロバイダ表示', /Simulator|Gemini/.test($('#provider-pill').textContent), $('#provider-pill').textContent);
 check('起動: モデル選択肢', $$('#model-select option').length >= 2, `${$$('#model-select option').length} 個`);
 
 // スキルを固定 → チップが出る
@@ -92,7 +92,7 @@ check('チャット: トークン設定時に認証ヘッダーを送る',
 const msgs = $$('#messages .msg');
 check('送信: ユーザー + アシスタントの2件', msgs.length === 2, `${msgs.length} 件`);
 const reply = msgs[1] ? msgs[1].querySelector('.content').textContent : '';
-check('応答: シミュレーション注記を含む', reply.includes('シミュレーションモード'), reply.slice(0, 40).replace(/\n/g, ' '));
+check('応答: シミュレーション注記を含む', reply.includes('Simulation mode'), reply.slice(0, 40).replace(/\n/g, ' '));
 check('応答: 適用スキルが選ばれている', msgs[1]?.querySelector('.who')?.textContent.includes('minutes-writer'), msgs[1]?.querySelector('.who')?.textContent.trim());
 check('Reply: the English brand-voice template is included', reply.includes('## Polished copy') && reply.includes('## Changes (up to 7 items)'));
 // マークダウンレンダラ単体
@@ -136,7 +136,7 @@ check('インスペクタ: system_instruction を表示', $('#inspector-body').t
 check('インスペクタ: 参照資料が system に含まれる', $('#inspector-body').textContent.includes('references/format.md'));
 $$('.inspector .tab')[2].dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
 await wait(50);
-check('インスペクタ: 統計タブ', $('#inspector-body').textContent.includes('トークン'));
+check('インスペクタ: 統計タブ', $('#inspector-body').textContent.includes('Tokens'));
 
 // スキル作成モーダル（会話からスキルを作る）
 $('#open-create').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
@@ -145,7 +145,7 @@ $('#draft-btn').dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
 for (let i = 0; i < 50 && $('#draft-result').classList.contains('hidden'); i++) await wait(100);
 check('スキル生成: ドラフトが返る', !$('#draft-result').classList.contains('hidden'));
 check('スキル生成: name が kebab-case', /^[a-z0-9-]+$/.test($('#draft-name').value), $('#draft-name').value);
-check('スキル生成: 本文にテンプレート見出し', $('#draft-body').value.includes('# 手順'));
+check('スキル生成: 本文にテンプレート見出し', $('#draft-body').value.includes('# Procedure'));
 
 // 保存してサイドバーへ反映
 $('#save-skill').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
@@ -176,7 +176,7 @@ check('APIキー: /api/config は生のキーを返さない', typeof configBefo
 $('#key-btn').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
 await wait(250);
 check('APIキー: 🔑 でパネルが開く', !$('#key-box').classList.contains('hidden'));
-check('APIキー: 状態が出どころつきで表示される', /設定済み|未設定/.test($('#key-status').textContent),
+check('APIキー: 状態が出どころつきで表示される', /Configured|Not configured/.test($('#key-status').textContent),
       $('#key-status').textContent);
 
 const tooShort = await serverFetch(`${BASE}/api/key`, {
@@ -200,7 +200,7 @@ await wait(200);
 $('#input').value = '今日は何日？';
 $('#send').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
 for (let i = 0; i < 60 && $$('#messages .tool-line').length === 0; i++) await wait(100);
-await wait(600);
+for (let i = 0; i < 100 && $$('#messages .msg.assistant .cursor').length; i++) await wait(100);
 const toolLines = $$('#messages .tool-line');
 check('ツール: 🛠 呼び出しと実行結果が表示される', toolLines.length >= 2, toolLines.map((n) => n.textContent.trim().slice(0, 30)).join(' / '));
 check('ツール: now が呼ばれる', toolLines.some((n) => n.textContent.includes('now')), toolLines[0]?.textContent.trim());
@@ -220,7 +220,7 @@ check('添付: チップが表示される', $$('#attach-chips .attach-chip').le
 
 $('#input').value = 'この画像を見て';
 $('#send').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-await wait(1200);
+for (let i = 0; i < 100 && $$('#messages .msg.assistant .cursor').length; i++) await wait(100);
 check('添付: 送信後に入力欄のチップが消える', $$('#attach-chips .attach-chip').length === 0);
 check('添付: ユーザーの発言にファイル名が出る', [...$$('#messages .msg.user')].some((m) => m.textContent.includes('test.png')));
 
@@ -265,7 +265,7 @@ await window.pollRoom();
 await wait(200);
 const roomMsgs = $$('#messages .msg');
 check('ルーム: ポーリングで返事が流れてくる', roomMsgs.length >= 3, `${roomMsgs.length} 件`);
-check('ルーム: 話者が区別される', /あなた/.test(roomMsgs[0].textContent) , roomMsgs[0].querySelector('.who').textContent.trim());
+check('ルーム: 話者が区別される', /You/.test(roomMsgs[0].textContent) , roomMsgs[0].querySelector('.who').textContent.trim());
 check('ルーム: 返事にスキルチップが出る', [...roomMsgs].some((m) => m.querySelector('.chip')));
 
 // 会話モードに戻る

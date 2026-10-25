@@ -2,7 +2,7 @@
 'use strict';
 
 // ====================================================================
-// 状態
+// State
 // ====================================================================
 const state = {
   config: null,
@@ -16,21 +16,21 @@ const state = {
   think: false,
   models: [],
   model: '',
-  selected: null,         // 直近の選択結果
-  system: '',             // 直近の system_instruction
+  selected: null,         // Most recent selection
+  system: '',             // Most recent system instruction
   usage: null,
-  notices: [],            // 429 / モデル切替の知らせ
+  notices: [],            // Rate-limit and model-fallback notices
   busy: false,
   abort: null,
   detail: null,
   rooms: [],
-  room: null,        // 開いているルーム名
+  room: null,        // Name of the open room
   roomCursor: 0,
   roomTimer: null,
   roomToken: localStorage.getItem('actor.roomToken') || '',
   apiAuthPrompted: false,
   attachments: [],   // {name, mime_type, size, data}
-  toolEvents: [],    // 直近ターンの tool_call / tool_result
+  toolEvents: [],    // Tool calls and results from the latest turn
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -84,7 +84,7 @@ async function api(path, options = {}) {
 }
 
 // ====================================================================
-// 添付（画像 / PDF）
+// Attachments (images / PDFs)
 // ====================================================================
 const ATTACH_LIMIT_MB = 10;
 
@@ -107,8 +107,8 @@ function renderAttachments() {
       file.mime_type.startsWith('image/')
         ? el('img', { class: 'thumb', src: `data:${file.mime_type};base64,${file.data}`, alt: file.name })
         : null,
-      el('span', { class: 'name' }, `${file.name}（${fmtSize(file.size)}）`),
-      el('button', { title: '外す', onclick: () => { state.attachments.splice(index, 1); renderAttachments(); } }, '✕'),
+      el('span', { class: 'name' }, `${file.name} (${fmtSize(file.size)})`),
+      el('button', { title: 'Remove attachment', onclick: () => { state.attachments.splice(index, 1); renderAttachments(); } }, '✕'),
     );
     wrap.append(item);
   });
@@ -116,9 +116,9 @@ function renderAttachments() {
 
 function readFiles(fileList) {
   for (const file of fileList) {
-    if (state.attachments.length >= 6) { toast('添付は 6 件までです', 'err'); break; }
+    if (state.attachments.length >= 6) { toast('You can attach up to 6 files.', 'err'); break; }
     if (file.size > ATTACH_LIMIT_MB * 1048576) {
-      toast(`${file.name} が大きすぎます（上限 ${ATTACH_LIMIT_MB}MB）`, 'err');
+      toast(`${file.name} is too large (limit: ${ATTACH_LIMIT_MB} MB).`, 'err');
       continue;
     }
     const reader = new FileReader();
@@ -139,18 +139,18 @@ function readFiles(fileList) {
 }
 
 // ====================================================================
-// Markdown（軽量レンダラ）
+// Markdown (lightweight renderer)
 // ====================================================================
 function renderMarkdown(src) {
   const blocks = [];
   let text = String(src ?? '').replace(/\r\n?/g, '\n');
-  // コードブロックを退避（閉じフェンスは開きと同じ長さ以上を要求 → ネストした ``` に強い）
+  // Preserve code blocks (closing fences must be at least as long as opening fences).
   text = text.replace(/(^|\n)(`{3,})([a-zA-Z0-9_+\-]*)[ \t]*\n([\s\S]*?)\n?\2[ \t]*(?=\n|$)/g,
     (_, lead, fence, lang, code) => {
       blocks.push(`<pre><code class="lang-${esc(lang)}">${esc(code.replace(/\n$/, ''))}</code></pre>`);
       return `${lead}\u0000B${blocks.length - 1}\u0000`;
     });
-  // 構造判定は生テキストで行い、インライン要素だけをエスケープして組み立てる
+  // Parse structure from raw text and escape only inline elements.
   const lines = text.split('\n');
   const out = [];
   let i = 0;
@@ -173,7 +173,7 @@ function renderMarkdown(src) {
       out.push(`<blockquote>${inline(buf.join('<br>'))}</blockquote>`);
       continue;
     }
-    // テーブル
+    // Tables
     if (line.includes('|') && i + 1 < lines.length && /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(lines[i + 1])) {
       const head = splitRow(line);
       i += 2;
@@ -185,7 +185,7 @@ function renderMarkdown(src) {
       );
       continue;
     }
-    // リスト
+    // Lists
     if (/^\s*(?:[-*+]|\d+[.)])\s+/.test(line)) {
       const ordered = /^\s*\d+[.)]\s+/.test(line);
       const items = [];
@@ -197,7 +197,7 @@ function renderMarkdown(src) {
       out.push(`<${tag}>${items.map((it) => `<li>${inline(it)}</li>`).join('')}</${tag}>`);
       continue;
     }
-    // 段落
+    // Paragraphs
     const para = [];
     while (i < lines.length && lines[i].trim() && !/^(#{1,6}\s|>|\s*(?:[-*+]|\d+[.)])\s|\u0000B)/.test(lines[i]) && !lines[i].includes('|')) {
       para.push(lines[i]); i++;
@@ -212,7 +212,7 @@ function splitRow(line) {
 }
 
 // ====================================================================
-// サイドバー: スキル / セッション
+// Sidebar: skills / sessions
 // ====================================================================
 async function loadSkills(query = '') {
   const data = await api(`/api/skills${query ? `?q=${encodeURIComponent(query)}` : ''}`);
@@ -228,29 +228,29 @@ function renderSkills() {
   const list = $('#skill-list');
   list.innerHTML = '';
   if (!state.skills.length) {
-    list.append(el('li', {}, el('div', { class: 'desc', html: 'スキルがありません。<br><code>skills/&lt;name&gt;/SKILL.md</code> を置くか、下のボタンで生成してください。' })));
+    list.append(el('li', {}, el('div', { class: 'desc', html: 'No skills found.<br>Add <code>skills/&lt;name&gt;/SKILL.md</code> or create one with the button below.' })));
     return;
   }
   const sorted = [...state.skills].sort((a, b) => (state.matches[b.name] || 0) - (state.matches[a.name] || 0) || a.name.localeCompare(b.name));
   for (const skill of sorted) {
     const badges = [];
-    if (skill.references.length) badges.push(el('span', { class: 'badge' }, `参照 ${skill.references.length}`));
+    if (skill.references.length) badges.push(el('span', { class: 'badge' }, `${skill.references.length} reference(s)`));
     if (skill.version) badges.push(el('span', { class: 'badge' }, `v${skill.version}`));
     if (skill.tags.length) badges.push(el('span', { class: 'badge acc' }, skill.tags[0]));
-    if (skill.warnings?.length) badges.push(el('span', { class: 'badge warn' }, '⚠ 要確認'));
+    if (skill.warnings?.length) badges.push(el('span', { class: 'badge warn' }, '⚠ Review required'));
     const score = state.matches[skill.name];
     const item = el('li', {
       class: state.pinned.has(skill.name) ? 'active' : '',
-      title: 'クリックで固定適用 / ⓘ で詳細',
+      title: 'Click to pin this skill; select ⓘ for details',
       onclick: (e) => { if (e.target.tagName !== 'BUTTON') togglePin(skill.name); },
     },
       el('div', { class: 'name' },
         `/${skill.name}`,
         score ? el('span', { class: 'badge warn' }, score.toFixed(1)) : null,
         el('span', { class: 'spacer' }),
-        el('button', { class: 'link-btn', title: '詳細', onclick: (e) => { e.stopPropagation(); openDetail(skill.name); } }, 'ⓘ'),
+        el('button', { class: 'link-btn', title: 'Details', onclick: (e) => { e.stopPropagation(); openDetail(skill.name); } }, 'ⓘ'),
       ),
-      el('div', { class: 'desc' }, skill.description || '(説明なし)'),
+      el('div', { class: 'desc' }, skill.description || '(No description)'),
       badges.length ? el('div', { class: 'badges' }, badges) : null,
     );
     list.append(item);
@@ -268,12 +268,12 @@ function renderPinned() {
   const wrap = $('#pinned-chips');
   wrap.innerHTML = '';
   if (!state.pinned.size) {
-    wrap.append(el('span', { class: 'muted small' }, state.auto ? 'スキルは自動選択されます' : '自動選択オフ：スキル未指定'));
+    wrap.append(el('span', { class: 'muted small' }, state.auto ? 'Skills are selected automatically' : 'Auto-selection is off; no skills pinned'));
     return;
   }
   for (const name of state.pinned) {
     wrap.append(el('span', { class: 'chip' }, `/${name}`,
-      el('button', { title: '解除', onclick: () => togglePin(name) }, '✕')));
+      el('button', { title: 'Unpin', onclick: () => togglePin(name) }, '✕')));
   }
 }
 
@@ -283,7 +283,7 @@ async function loadSessions() {
   const list = $('#session-list');
   list.innerHTML = '';
   if (!state.sessions.length) {
-    list.append(el('li', {}, el('div', { class: 'desc' }, 'まだ会話がありません。')));
+    list.append(el('li', {}, el('div', { class: 'desc' }, 'No chats yet.')));
     return;
   }
   for (const session of state.sessions) {
@@ -291,14 +291,14 @@ async function loadSessions() {
       el('div', { class: 'name' },
         session.title,
         el('span', { class: 'spacer' }),
-        el('button', { class: 'link-btn', title: '削除', onclick: async (e) => {
+        el('button', { class: 'link-btn', title: 'Delete', onclick: async (e) => {
           e.stopPropagation();
           await api(`/api/sessions/${session.id}`, { method: 'DELETE' });
           if (state.sessionId === session.id) newSession();
           await loadSessions();
         } }, '🗑'),
       ),
-      el('div', { class: 'desc' }, session.preview || '(空)'),
+      el('div', { class: 'desc' }, session.preview || '(Empty)'),
       el('div', { class: 'badges' },
         el('span', { class: 'badge' }, `${session.turn_count} turn`),
         ...(session.skills || []).map((s) => el('span', { class: 'badge acc' }, `/${s}`)),
@@ -320,7 +320,7 @@ async function openSession(id) {
   renderSkills();
   renderMessages();
   await loadSessions();
-  toast(`セッション「${session.title}」を読み込みました`);
+  toast(`Loaded session “${session.title}”.`);
 }
 
 function newSession() {
@@ -338,7 +338,7 @@ function newSession() {
 }
 
 // ====================================================================
-// ルーム（常駐ボットとの会話）
+// Rooms (chat with resident bots)
 // ====================================================================
 async function loadRooms() {
   const data = await api('/api/rooms');
@@ -346,23 +346,23 @@ async function loadRooms() {
   const list = $('#room-list');
   list.innerHTML = '';
   if (!state.rooms.length) {
-    list.append(el('li', {}, el('div', { class: 'desc' }, 'まだルームがありません。上で名前を入れて ＋ を押すと作成できます。')));
+    list.append(el('li', {}, el('div', { class: 'desc' }, 'No rooms yet. Enter a name above and click + to create one.')));
     return;
   }
   for (const room of state.rooms) {
     const item = el('li', { class: room.name === state.room ? 'active' : '' },
       el('div', { class: 'name' }, `#${room.name}`,
         el('span', { class: 'spacer' }),
-        el('button', { class: 'link-btn', title: '削除', onclick: async (e) => {
+        el('button', { class: 'link-btn', title: 'Delete', onclick: async (e) => {
           e.stopPropagation();
-          if (!confirm(`ルーム「${room.name}」を削除しますか？`)) return;
+          if (!confirm(`Delete room “${room.name}”?`)) return;
           await api(`/api/rooms/${encodeURIComponent(room.name)}`, { method: 'DELETE' });
           if (state.room === room.name) leaveRoom();
           await loadRooms();
         } }, '🗑')),
-      el('div', { class: 'desc' }, room.preview || '(発言なし)'),
+      el('div', { class: 'desc' }, room.preview || '(No messages)'),
       el('div', { class: 'badges' },
-        el('span', { class: 'badge' }, `${room.count} 件`),
+        el('span', { class: 'badge' }, `${room.count} message(s)`),
         ...(room.skills || []).map((s) => el('span', { class: 'badge acc' }, `/${s}`)),
         el('span', { class: 'badge' }, (room.updated_at || '').slice(5, 16).replace('T', ' '))),
     );
@@ -374,11 +374,11 @@ async function loadRooms() {
 async function createRoom() {
   const input = $('#room-name');
   const name = input.value.trim();
-  if (!name) return toast('ルーム名を入れてください', 'err');
+  if (!name) return toast('Enter a room name.', 'err');
   try {
     const data = await api('/api/rooms', { method: 'POST', body: { name, skills: [...state.pinned] } });
     input.value = '';
-    toast(`ルーム #${data.room.name} を開きました`);
+    toast(`Opened room #${data.room.name}.`);
     await loadRooms();
     openRoom(data.room.name);
   } catch (err) { toast(err.message, 'err'); }
@@ -392,7 +392,7 @@ async function openRoom(name) {
   $('#room-banner-name').textContent = `#${name}`;
   if (state.config?.room_token_required) $('#room-token').classList.remove('hidden');
   $('#room-token').value = state.roomToken;
-  $('#room-banner-status').textContent = '常駐ボットの返事を待っています…';
+  $('#room-banner-status').textContent = 'Waiting for the resident bot…';
   $('#messages').innerHTML = '';
   await loadRooms();
   await pollRoom();
@@ -420,7 +420,7 @@ async function pollRoom() {
     data = await api(`/api/rooms/${encodeURIComponent(state.room)}?after=${state.roomCursor}`);
   } catch (err) {
     stopRoomPolling();
-    toast(`ルームを取得できません: ${err.message}`, 'err');
+    toast(`Could not load room: ${err.message}`, 'err');
     return;
   }
   const messages = data.messages || [];
@@ -444,7 +444,7 @@ async function pollRoom() {
   scrollToBottom();
   const last = messages[messages.length - 1];
   $('#room-banner-status').textContent =
-    `${data.count} 件 / 最終 ${(last.ts || '').slice(11, 19)}（${last.author || last.role}）`;
+    `${data.count} message(s) / latest ${(last.ts || '').slice(11, 19)} (${last.author || last.role})`;
 }
 
 async function sendToRoom(text) {
@@ -456,7 +456,7 @@ async function sendToRoom(text) {
     await api(`/api/rooms/${encodeURIComponent(name)}/messages`, {
       method: 'POST',
       body: {
-        text, author: 'あなた', skills: [...state.pinned],
+        text, author: 'You', skills: [...state.pinned],
         attachments: attachments.map((a) => ({
           name: a.name, mime_type: a.mime_type, size: a.size, data: a.data,
         })),
@@ -465,12 +465,12 @@ async function sendToRoom(text) {
     await pollRoom();
   } catch (err) {
     toast(err.message, 'err');
-    if (/トークン/.test(err.message)) $('#room-token').classList.remove('hidden');
+    if (/token/i.test(err.message)) $('#room-token').classList.remove('hidden');
   }
 }
 
 // ====================================================================
-// メッセージ表示
+// Render messages
 // ====================================================================
 function renderMessages() {
   const wrap = $('#messages');
@@ -485,13 +485,13 @@ function renderMessages() {
 
 function buildEmptyState() {
   const examples = [
-    '会議の文字起こしから議事録を作って',
-    'このリリースノートを社外向けに書き直して',
-    'コードレビューの観点でこの差分を見て',
+    'Turn this meeting transcript into structured minutes',
+    'Rewrite these release notes for an external audience',
+    'Review this diff for correctness and security issues',
   ];
   const node = el('div', { class: 'empty' },
-    el('h2', {}, 'SKILL.md を読み込んで、Gemini と話す'),
-    el('p', { class: 'muted', html: '<code>skills/</code> の <code>SKILL.md</code> がそのまま <code>system_instruction</code> になります。左のスキルをクリックで固定適用（複数可）、入力欄で <kbd>/</kbd> を打つと呼び出せます。' }),
+    el('h2', {}, 'Chat with Gemini using SKILL.md'),
+    el('p', { class: 'muted', html: '<code>SKILL.md</code> files in <code>skills/</code> become the <code>system_instruction</code>. Click skills on the left to pin them, or type <kbd>/</kbd> in the composer to invoke one.' }),
     el('div', { class: 'examples' }, examples.map((t) => el('button', { class: 'example', onclick: () => { $('#input').value = t; sendMessage(); } }, t))),
   );
   return node;
@@ -515,13 +515,13 @@ function buildMessageNode(message) {
     file.mime_type && file.mime_type.startsWith('image/') && file.data
       ? el('img', { class: 'thumb', src: `data:${file.mime_type};base64,${file.data}`, alt: file.name })
       : el('span', { class: 'thumb-ico' }, file.mime_type === 'application/pdf' ? '📄' : '📎'),
-    el('span', { class: 'name' }, `${file.name}${file.size ? `（${fmtSize(file.size)}）` : ''}`),
+    el('span', { class: 'name' }, `${file.name}${file.size ? ` (${fmtSize(file.size)})` : ''}`),
   ));
 
   const body = el('div', { class: 'body' },
-    el('div', { class: 'who' }, meta.author || (isUser ? 'あなた' : 'Actor'),
+    el('div', { class: 'who' }, meta.author || (isUser ? 'You' : 'Actor'),
       meta.ts ? el('span', { class: 'msg-meta' }, (meta.ts || '').slice(11, 19)) : null,
-      message.meta?.simulated ? el('span', { class: 'badge warn' }, 'シミュレーション') : null,
+      message.meta?.simulated ? el('span', { class: 'badge warn' }, 'Simulation') : null,
       message.meta?.model ? el('span', { class: 'muted' }, message.meta.model) : null,
       message.meta?.usage?.candidatesTokenCount ? el('span', { class: 'muted' }, `out ${fmt(message.meta.usage.candidatesTokenCount)} tok`) : null,
     ),
@@ -532,12 +532,12 @@ function buildMessageNode(message) {
 
   if (!isUser && meta.thoughts) {
     body.append(el('details', {},
-      el('summary', {}, `🧠 思考ログ（${meta.thoughts.length} 文字）`),
+      el('summary', {}, `🧠 Thoughts (${meta.thoughts.length} characters)`),
       el('div', { class: 'thought' }, meta.thoughts)));
   }
   if (!isUser) {
     body.append(el('div', { class: 'msg-actions' },
-      el('button', { class: 'link-btn', onclick: () => { navigator.clipboard.writeText(message.content); toast('コピーしました'); } }, 'コピー'),
+      el('button', { class: 'link-btn', onclick: () => { navigator.clipboard.writeText(message.content); toast('Copied to clipboard.'); } }, 'Copy'),
       el('button', { class: 'link-btn', onclick: () => showInInspector('system') }, 'system_instruction'),
     ));
   }
@@ -552,7 +552,7 @@ function scrollToBottom(force = false) {
 }
 
 // ====================================================================
-// 送信
+// Send message
 // ====================================================================
 async function sendMessage(textOverride) {
   if (state.room) {
@@ -570,7 +570,7 @@ async function sendMessage(textOverride) {
   let text = (textOverride ?? input.value).trim();
   if (!text) return;
 
-  // `/skill 依頼文` 形式の先頭トークンを固定スキルとして扱う
+  // Treat a leading `/skill request` token as a pinned skill.
   const pinned = new Set(state.pinned);
   const match = text.match(/^\/([a-z0-9-]+)\s+([\s\S]+)$/i);
   if (match && state.skills.some((s) => s.name === match[1].toLowerCase())) {
@@ -659,7 +659,7 @@ async function sendMessage(textOverride) {
   } catch (err) {
     if (err.name !== 'AbortError') {
       live.innerHTML = `<p class="muted">⚠ ${esc(err.message)}</p>`;
-      toast(`エラー: ${err.message}`, 'err');
+      toast(`Error: ${err.message}`, 'err');
     }
   }
 
@@ -675,7 +675,7 @@ async function sendMessage(textOverride) {
                   el('span', { class: 'muted' }, `${fmt(event.system_tokens)} tok`));
         chips.innerHTML = '';
         for (const s of event.skills) chips.append(el('span', { class: 'chip' }, `/${s.name}`));
-        if (event.missing?.length) chips.append(el('span', { class: 'badge warn' }, `未検出: ${event.missing.join(', ')}`));
+        if (event.missing?.length) chips.append(el('span', { class: 'badge warn' }, `Not found: ${event.missing.join(', ')}`));
         renderInspector();
         scroll();
         break;
@@ -700,10 +700,10 @@ async function sendMessage(textOverride) {
         break;
       }
       case 'tool_limit':
-        body.insertBefore(el('div', { class: 'tool-line err' }, 'ツールの実行回数が上限に達しました'), live);
+        body.insertBefore(el('div', { class: 'tool-line err' }, 'Maximum tool-call rounds reached.'), live);
         break;
       case 'notice': {
-        // 429 でキー / モデルを切り替えた、などの知らせ（本文には混ぜない）
+        // Notices such as key rotation or model fallback (kept separate from the reply).
         const text = event.text || '';
         if (text) {
           body.insertBefore(el('div', { class: 'tool-line' }, `🔁 ${text}`), live);
@@ -720,7 +720,7 @@ async function sendMessage(textOverride) {
         paint();
         break;
       case 'error':
-        answer += `\n\n> ⚠ エラー: ${event.text}`;
+        answer += `\n\n> ⚠ Error: ${event.text}`;
         paint(true);
         break;
       case 'done':
@@ -734,11 +734,11 @@ async function sendMessage(textOverride) {
 
   if (thoughts.trim()) {
     body.append(el('details', {},
-      el('summary', {}, `🧠 思考ログ（${thoughts.length} 文字）`),
+      el('summary', {}, `🧠 Thoughts (${thoughts.length} characters)`),
       el('div', { class: 'thought' }, thoughts)));
   }
   body.append(el('div', { class: 'msg-actions' },
-    el('button', { class: 'link-btn', onclick: () => { navigator.clipboard.writeText(answer); toast('コピーしました'); } }, 'コピー'),
+    el('button', { class: 'link-btn', onclick: () => { navigator.clipboard.writeText(answer); toast('Copied to clipboard.'); } }, 'Copy'),
     el('button', { class: 'link-btn', onclick: () => showInInspector('system') }, 'system_instruction')));
 
   const lastNotice = state.notices[state.notices.length - 1];
@@ -774,26 +774,26 @@ function badgeClass(event) {
   return event.names?.length ? 'badge acc' : 'badge';
 }
 function describeSelection(event) {
-  if (event.missing?.length) return `スキル未検出: ${event.missing.join(', ')}`;
-  if (!event.names?.length) return 'スキルなし';
-  return `適用: ${event.names.map((n) => '/' + n).join(' + ')}`;
+  if (event.missing?.length) return `Skills not found: ${event.missing.join(', ')}`;
+  if (!event.names?.length) return 'No skills selected';
+  return `Applied: ${event.names.map((n) => '/' + n).join(' + ')}`;
 }
 
 function setSendButton(busy) {
   const button = $('#send');
   if (state.room) {
-    $('.send-label', button).textContent = '送信';
+    $('.send-label', button).textContent = 'Send';
     button.onclick = () => sendMessage();
     return;
   }
   button.classList.toggle('primary', !busy);
   button.classList.toggle('danger', busy);
-  $('.send-label', button).textContent = busy ? '停止' : '送信';
-  button.onclick = busy ? () => { state.abort?.abort(); toast('停止しました'); } : () => sendMessage();
+  $('.send-label', button).textContent = busy ? 'Stop' : 'Send';
+  button.onclick = busy ? () => { state.abort?.abort(); toast('Stopped.'); } : () => sendMessage();
 }
 
 // ====================================================================
-// インスペクタ
+// Inspector
 // ====================================================================
 function showInInspector(tab) {
   $$('.inspector .tab').forEach((t) => t.classList.toggle('active', t.dataset.itab === tab));
@@ -808,35 +808,35 @@ function renderInspector() {
   if (tab === 'applied') {
     const selection = state.selected;
     if (!selection) {
-      wrap.append(el('div', { class: 'card' }, el('p', { class: 'muted small' }, 'まだ送信していません。Message を送ると、どのスキルが適用されたかここに表示されます。')));
+      wrap.append(el('div', { class: 'card' }, el('p', { class: 'muted small' }, 'No message sent yet. Send a message to see which skills were applied.')));
       return;
     }
     wrap.append(el('div', { class: 'card' },
-      el('h4', {}, '適用スキル'),
+      el('h4', {}, 'Applied skills'),
       el('div', { class: 'kv' },
-        el('dt', {}, '固定'), el('dd', {}, [...state.pinned].join(', ') || 'なし'),
-        el('dt', {}, '選択'), el('dd', {}, selection.names.join(', ') || 'なし'),
-        el('dt', {}, '文字数'), el('dd', {}, `${fmt(selection.system_chars)} 文字`),
-        el('dt', {}, '推定'), el('dd', {}, `${fmt(selection.system_tokens)} tokens`),
+        el('dt', {}, 'Pinned'), el('dd', {}, [...state.pinned].join(', ') || 'None'),
+        el('dt', {}, 'Selected'), el('dd', {}, selection.names.join(', ') || 'None'),
+        el('dt', {}, 'Characters'), el('dd', {}, `${fmt(selection.system_chars)} characters`),
+        el('dt', {}, 'Estimated'), el('dd', {}, `${fmt(selection.system_tokens)} tokens`),
       )));
     if (selection.missing?.length) {
-      wrap.append(el('div', { class: 'card' }, el('h4', {}, '⚠ 未検出'), el('div', { class: 'muted small' }, selection.missing.join(', '))));
+      wrap.append(el('div', { class: 'card' }, el('h4', {}, '⚠ Not found'), el('div', { class: 'muted small' }, selection.missing.join(', '))));
     }
     for (const skill of selection.skills) {
       wrap.append(el('div', { class: 'card' },
         el('h4', {}, `/${skill.name}`),
-        el('p', { class: 'muted small' }, skill.description || '(説明なし)'),
+        el('p', { class: 'muted small' }, skill.description || '(No description)'),
         el('div', { class: 'kv' },
           el('dt', {}, 'hash'), el('dd', {}, skill.hash),
-          el('dt', {}, '参照'), el('dd', {}, `${skill.references.length} ファイル`),
-          el('dt', {}, '本文'), el('dd', {}, `${fmt(skill.instruction_chars)} 文字`),
+          el('dt', {}, 'References'), el('dd', {}, `${skill.references.length} file(s)`),
+          el('dt', {}, 'Instructions'), el('dd', {}, `${fmt(skill.instruction_chars)} characters`),
         ),
-        el('button', { class: 'btn ghost', style: 'margin-top:8px', onclick: () => openDetail(skill.name) }, '詳細を開く')));
+        el('button', { class: 'btn ghost', style: 'margin-top:8px', onclick: () => openDetail(skill.name) }, 'Open details')));
     }
     const scores = (selection.auto_scores || []).filter((s) => s.score > 0);
     if (scores.length) {
       const max = Math.max(...scores.map((s) => s.score), 1);
-      const card = el('div', { class: 'card' }, el('h4', {}, '自動選択スコア'));
+      const card = el('div', { class: 'card' }, el('h4', {}, 'Auto-selection scores'));
       for (const item of scores.slice(0, 6)) {
         card.append(
           el('div', { class: 'small', style: 'display:flex;gap:8px;align-items:center' },
@@ -846,47 +846,47 @@ function renderInspector() {
           el('div', { class: 'score-bar' }, el('i', { style: `width:${Math.round((item.score / max) * 100)}%` })),
         );
       }
-      card.append(el('p', { class: 'muted small', style: 'margin-top:8px' }, `閾値 ${state.config?.auto_select_threshold ?? 2.0} 以上を採用`));
+      card.append(el('p', { class: 'muted small', style: 'margin-top:8px' }, `Selected when score is at least ${state.config?.auto_select_threshold ?? 2.0}`));
       wrap.append(card);
     }
   } else if (tab === 'system') {
     const card = el('div', { class: 'card' },
       el('h4', {}, 'system_instruction'),
-      el('p', { class: 'muted small' }, 'ここに表示された文字列が、そのまま Gemini API の systemInstruction に渡されます。'),
-      el('button', { class: 'btn ghost', onclick: () => { navigator.clipboard.writeText(state.system); toast('コピーしました'); } }, 'コピー'));
+      el('p', { class: 'muted small' }, 'This text is sent to the Gemini API as the system instruction.'),
+      el('button', { class: 'btn ghost', onclick: () => { navigator.clipboard.writeText(state.system); toast('Copied to clipboard.'); } }, 'Copy'));
     wrap.append(card);
-    wrap.append(el('pre', { class: 'system' }, state.system || '（まだ送信していません）'));
+    wrap.append(el('pre', { class: 'system' }, state.system || '(No message sent yet)'));
   } else {
     const usage = state.usage || {};
     wrap.append(el('div', { class: 'card' },
-      el('h4', {}, 'トークン'),
+      el('h4', {}, 'Tokens'),
       el('div', { class: 'kv' },
-        el('dt', {}, '入力'), el('dd', {}, fmt(usage.promptTokenCount)),
-        el('dt', {}, '出力'), el('dd', {}, fmt(usage.candidatesTokenCount)),
-        el('dt', {}, '思考'), el('dd', {}, fmt(usage.thoughtsTokenCount)),
-        el('dt', {}, '合計'), el('dd', {}, fmt(usage.totalTokenCount)),
+        el('dt', {}, 'Input'), el('dd', {}, fmt(usage.promptTokenCount)),
+        el('dt', {}, 'Output'), el('dd', {}, fmt(usage.candidatesTokenCount)),
+        el('dt', {}, 'Thoughts'), el('dd', {}, fmt(usage.thoughtsTokenCount)),
+        el('dt', {}, 'Total'), el('dd', {}, fmt(usage.totalTokenCount)),
       )));
     const config = state.config || {};
     wrap.append(el('div', { class: 'card' },
-      el('h4', {}, '設定'),
+      el('h4', {}, 'Configuration'),
       el('div', { class: 'kv' },
         el('dt', {}, 'provider'), el('dd', {}, config.provider),
         el('dt', {}, 'model'), el('dd', {}, state.model || config.model),
         el('dt', {}, 'temp'), el('dd', {}, String(config.temperature)),
         el('dt', {}, 'max out'), el('dd', {}, fmt(config.max_output_tokens)),
         el('dt', {}, 'thinking'), el('dd', {}, fmt(config.thinking_budget)),
-        el('dt', {}, 'スキル'), el('dd', {}, `${state.skills.length} 件`),
-        el('dt', {}, '保存先'), el('dd', {}, config.data_dir || ''),
+        el('dt', {}, 'Skills'), el('dd', {}, `${state.skills.length} skill(s)`),
+        el('dt', {}, 'Data directory'), el('dd', {}, config.data_dir || ''),
       )));
     if (config.simulated) {
-      wrap.append(el('div', { class: 'card' }, el('h4', {}, '🎭 シミュレーションモード'),
-        el('p', { class: 'muted small', html: 'API キーが未設定です。<code>.env</code> に <code>GEMINI_API_KEY</code> を設定 → サーバー再起動で、同じ UI のまま実モデルに切り替わります。' })));
+      wrap.append(el('div', { class: 'card' }, el('h4', {}, '🎭 Simulation mode'),
+        el('p', { class: 'muted small', html: 'No API key is configured. Set <code>GEMINI_API_KEY</code> in <code>.env</code> and restart the server to use a live model.' })));
     }
   }
 }
 
 // ====================================================================
-// モーダル
+// Modals
 // ====================================================================
 function openModal(id) { $(id).classList.remove('hidden'); }
 function closeModal(node) { node.classList.add('hidden'); }
@@ -905,7 +905,7 @@ async function openDetail(name) {
   $('#detail-title').textContent = `/${data.name}`;
   const body = $('#detail-body');
   body.innerHTML = '';
-  body.append(el('p', { class: 'muted' }, data.description || '(説明なし)'));
+  body.append(el('p', { class: 'muted' }, data.description || '(No description)'));
   body.append(el('div', { class: 'kv' },
     el('dt', {}, 'path'), el('dd', {}, data.path),
     el('dt', {}, 'hash'), el('dd', {}, data.hash),
@@ -914,7 +914,7 @@ async function openDetail(name) {
   ));
   for (const warning of data.warnings || []) body.append(el('div', { class: 'badge warn' }, warning));
   if (data.references?.length) {
-    body.append(el('h4', {}, `参照ファイル（${data.references.length}）`));
+    body.append(el('h4', {}, `References (${data.references.length})`));
     const list = el('div', { class: 'field' });
     for (const ref of data.references) {
       list.append(el('div', { class: 'small mono' }, `${ref.relpath}  ·  ${ref.kind}  ·  ${fmt(ref.size)} bytes${ref.error ? `  ⚠ ${ref.error}` : ''}`));
@@ -931,10 +931,10 @@ $('#detail-export').addEventListener('click', () => {
 });
 $('#detail-delete').addEventListener('click', async () => {
   if (!state.detail) return;
-  if (!confirm(`スキル「${state.detail.name}」を削除しますか？（元に戻せません）`)) return;
+  if (!confirm(`Delete skill “${state.detail.name}”? This cannot be undone.`)) return;
   try {
     await api(`/api/skills/${encodeURIComponent(state.detail.name)}`, { method: 'DELETE' });
-    toast('削除しました');
+    toast('Deleted skill.');
     state.pinned.delete(state.detail.name);
     closeModal($('#detail-modal'));
     await loadSkills($('#skill-search').value);
@@ -942,13 +942,13 @@ $('#detail-delete').addEventListener('click', async () => {
   } catch (err) { toast(err.message, 'err'); }
 });
 
-// スキル作成
+// Create skill
 $('#open-create').addEventListener('click', () => { $('#draft-result').classList.add('hidden'); openModal('#create-modal'); });
 $('#draft-btn').addEventListener('click', async () => {
   const request = $('#draft-request').value.trim();
-  if (!request) return toast('作りたい作業を書いてください', 'err');
+  if (!request) return toast('Describe the task you want to automate.', 'err');
   const button = $('#draft-btn');
-  button.disabled = true; button.textContent = '生成中…';
+  button.disabled = true; button.textContent = 'Generating…';
   try {
     const data = await api('/api/skills/draft', { method: 'POST', body: { request } });
     $('#draft-name').value = data.draft.name;
@@ -957,7 +957,7 @@ $('#draft-btn').addEventListener('click', async () => {
     $('#draft-result').classList.remove('hidden');
     $('#save-skill').disabled = false;
   } catch (err) { toast(err.message, 'err'); }
-  finally { button.disabled = false; button.textContent = 'ドラフトを生成'; }
+  finally { button.disabled = false; button.textContent = 'Generate draft'; }
 });
 $('#save-skill').addEventListener('click', async () => {
   try {
@@ -970,7 +970,7 @@ $('#save-skill').addEventListener('click', async () => {
         overwrite: true,
       },
     });
-    toast(`スキル「${data.skill.name}」を保存しました`);
+    toast(`Saved skill “${data.skill.name}”.`);
     closeModal($('#create-modal'));
     await loadSkills();
     togglePin(data.skill.name);
@@ -980,7 +980,7 @@ $('#save-skill').addEventListener('click', async () => {
 $('#help-btn').addEventListener('click', () => openModal('#help-modal'));
 
 // ====================================================================
-// 入力欄: オートコンプリート
+// Composer: autocomplete
 // ====================================================================
 const input = $('#input');
 let acIndex = 0;
@@ -1064,27 +1064,27 @@ function moveAc(delta) {
 function updateFontHint() {
   const token = currentSlashToken();
   $('#composer-hint').textContent = token
-    ? '↑↓ で選択 / Enter か Tab で確定'
-    : (state.pinned.size ? `${state.pinned.size} 件のスキルを固定中` : '');
+    ? 'Use ↑↓ to select; press Enter or Tab to confirm'
+    : (state.pinned.size ? `${state.pinned.size} skill(s) pinned` : '');
 }
 
 // ====================================================================
-// トグル / ヘッダ
+// Toggles / header
 // ====================================================================
 $('#auto-toggle').addEventListener('change', (e) => {
   state.auto = e.target.checked;
   localStorage.setItem('actor.auto', state.auto ? '1' : '0');
   renderPinned();
-  toast(`自動選択: ${state.auto ? 'ON' : 'OFF'}`);
+  toast(`Auto-select skills: ${state.auto ? 'ON' : 'OFF'}`);
 });
 $('#think-toggle').addEventListener('change', (e) => {
   state.think = e.target.checked;
   localStorage.setItem('actor.think', state.think ? '1' : '0');
-  toast(`思考ログ: ${state.think ? 'ON' : 'OFF'}（thinkingConfig はサーバー起動時の ACTOR_THINKING_BUDGET で有効化）`);
+  toast(`Thought log: ${state.think ? 'ON' : 'OFF'} (enable thinkingConfig with ACTOR_THINKING_BUDGET when starting the server)`);
 });
 $('#model-select').addEventListener('change', (e) => {
   state.model = e.target.value;
-  toast(`モデル表示を ${state.model} に変更（サーバー側の実モデルは再起動時に反映）`);
+  toast(`Displayed model set to ${state.model}. Restart the server to change the active model.`);
 });
 $('#export-btn').addEventListener('click', () => {
   const names = [...state.pinned];
@@ -1099,7 +1099,7 @@ $('#room-token-save').addEventListener('click', async () => {
   state.roomToken = $('#room-token').value.trim();
   localStorage.setItem('actor.roomToken', state.roomToken);
   if (state.room) { state.roomCursor = 0; await openRoom(state.room); }
-  toast(state.roomToken ? 'トークンを保存しました' : 'トークンを消しました');
+  toast(state.roomToken ? 'Room token saved.' : 'Room token cleared.');
 });
 $('#room-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') createRoom(); });
 $('#room-leave').addEventListener('click', leaveRoom);
@@ -1124,24 +1124,24 @@ $('#key-btn').addEventListener('click', async () => {
 $('#key-save').addEventListener('click', async () => {
   const input = $('#key-input');
   const value = input.value.trim();
-  if (!value) return toast('キーを貼り付けてください', 'err');
+  if (!value) return toast('Paste an API key.', 'err');
   const button = $('#key-save');
   button.disabled = true;
-  $('#key-result').textContent = '確認しています…';
+  $('#key-result').textContent = 'Checking…';
   try {
     const info = await api('/api/key', { method: 'POST', body: { api_key: value, check: true } });
     input.value = '';
     const check = info.check || {};
     if (check.ok) {
-      $('#key-result').textContent = `接続 OK（${check.models?.length ?? 0} models）`;
-      toast(`Gemini に接続しました（${info.model}）`);
+      $('#key-result').textContent = `Connected (${check.models?.length ?? 0} models).`;
+      toast(`Connected to Gemini (${info.model}).`);
     } else if (check.error) {
       $('#key-result').textContent =
-        `キーは保存しましたが接続できませんでした（いまはシミュレータのまま）: ${check.error}`;
-      toast('保存しましたが接続できませんでした', 'err');
+        `Key saved, but connection failed; simulation mode remains active: ${check.error}`;
+      toast('Saved the key, but connection failed.', 'err');
     } else {
-      $('#key-result').textContent = '保存しました';
-      toast('API キーを保存しました');
+      $('#key-result').textContent = 'Key saved.';
+      toast('API key saved.');
     }
     await refreshProviderUI();
   } catch (err) {
@@ -1154,8 +1154,8 @@ $('#key-save').addEventListener('click', async () => {
 $('#key-clear').addEventListener('click', async () => {
   try {
     await api('/api/key', { method: 'DELETE' });
-    $('#key-result').textContent = '解除しました（シミュレータに戻りました）';
-    toast('API キーを解除しました');
+    $('#key-result').textContent = 'API key cleared; returned to simulation mode.';
+    toast('API key cleared.');
     await refreshProviderUI();
   } catch (err) {
     toast(err.message, 'err');
@@ -1163,23 +1163,23 @@ $('#key-clear').addEventListener('click', async () => {
 });
 
 // ====================================================================
-// API キー（私用ならここが分かりやすい）
+// API key status
 // ====================================================================
 async function refreshKeyStatus() {
   try {
     const info = await api('/api/key');
     const status = $('#key-status');
     if (info.has_key) {
-      const source = { env: '環境変数', '.env': '.env', file: '.actor/api_key', keys: '.actor/keys' }[info.source] || info.source;
-      const count = info.key_count > 1 ? ` / ${info.key_count} キー（空き ${info.keys_ready}）` : '';
-      const limits = info.stats?.limits ? ` / 429 で ${info.stats.limits} 回切替` : '';
-      status.textContent = `設定済み: ${info.masked}（${source}）${count}${limits} / ${info.provider}`;
+      const source = { env: 'environment variable', '.env': '.env', file: '.actor/api_key', keys: '.actor/keys' }[info.source] || info.source;
+      const count = info.key_count > 1 ? ` / ${info.key_count} key(s) (${info.keys_ready} ready)` : '';
+      const limits = info.stats?.limits ? ` / ${info.stats.limits} rate-limit rotation(s)` : '';
+      status.textContent = `Configured: ${info.masked} (${source})${count}${limits} / ${info.provider}`;
     } else {
-      status.textContent = '未設定（シミュレータで動作中）';
+      status.textContent = 'Not configured (simulation mode)';
     }
     $('#key-clear').disabled = !info.has_key;
   } catch (err) {
-    $('#key-status').textContent = `確認できません: ${err.message}`;
+    $('#key-status').textContent = `Could not check status: ${err.message}`;
   }
 }
 
@@ -1189,20 +1189,20 @@ async function refreshProviderUI() {
   const pill = $('#provider-pill');
   if (config.simulated) {
     pill.className = 'pill sim';
-    pill.textContent = '🎭 シミュレータ（APIキー未設定）';
+    pill.textContent = '🎭 Simulator (no API key)';
   } else {
     pill.className = 'pill ok';
     pill.textContent = `Gemini: ${config.model}`;
   }
   $('#composer-hint').textContent = config.simulated
-    ? 'シミュレータで動作中（🔑 から API キーを入れると実モデルに切り替わります）'
+    ? 'Simulation mode (add an API key with 🔑 to use a live model)'
     : '';
   await loadSkills().catch(() => {});
   await refreshKeyStatus();
 }
 
 // ====================================================================
-// 起動
+// Startup
 // ====================================================================
 async function boot() {
   state.auto = localStorage.getItem('actor.auto') !== '0';
@@ -1216,7 +1216,7 @@ async function boot() {
     const pill = $('#provider-pill');
     if (config.simulated) {
       pill.className = 'pill sim';
-      pill.textContent = '🎭 シミュレータ（APIキー未設定）';
+      pill.textContent = '🎭 Simulator (no API key)';
     } else {
       pill.className = 'pill ok';
       pill.textContent = `Gemini: ${config.model}`;
@@ -1231,20 +1231,20 @@ async function boot() {
     }
     if (!state.models.includes(config.model)) select.append(el('option', { selected: true }, config.model));
     $('#composer-hint').textContent = config.simulated
-      ? 'シミュレータで動作中（左下の 🔑 から API キーを入れると実モデルに切替）'
+      ? 'Simulation mode (add an API key with 🔑 at the lower left to use a live model)'
       : '';
     await refreshKeyStatus();
   } catch (err) {
     if (err.status === 403 && !state.apiAuthPrompted) {
       state.apiAuthPrompted = true;
-      const token = window.prompt('この Actor サーバーの API トークンを入力してください');
+      const token = window.prompt('Enter the API token for this Actor server');
       if (token) {
         state.roomToken = token.trim();
         localStorage.setItem('actor.roomToken', state.roomToken);
         return boot();
       }
     }
-    toast(`設定の取得に失敗: ${err.message}`, 'err');
+    toast(`Could not load configuration: ${err.message}`, 'err');
   }
 
   await loadSkills();
@@ -1254,6 +1254,6 @@ async function boot() {
   input.focus();
 }
 
-function renderInventory() { /* 予約: 将来の拡張用 */ }
+function renderInventory() { /* Reserved for future use */ }
 
 boot();

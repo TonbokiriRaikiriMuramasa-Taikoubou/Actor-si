@@ -134,25 +134,25 @@ class ActorHandler(BaseHTTPRequestHandler):
         if length <= 0:
             return {}
         if length > MAX_BODY:
-            raise ValueError("リクエストが大きすぎます")
+            raise ValueError("Request body is too large")
         raw = self.rfile.read(length)
         if not raw:
             return {}
         try:
             payload = json.loads(raw.decode("utf-8"))
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-            raise ValueError(f"JSON を解釈できません: {exc}") from exc
+            raise ValueError(f"Invalid JSON: {exc}") from exc
         if not isinstance(payload, dict):
-            raise ValueError("JSON オブジェクトを送ってください")
+            raise ValueError("Expected a JSON object")
         return payload
 
     # ---- ルーティング ----
     def do_OPTIONS(self) -> None:  # noqa: N802
         if not self._valid_host():
-            self._error(400, "不正な Host ヘッダーです")
+            self._error(400, "Invalid Host header")
             return
         if not self._origin_allowed():
-            self._error(403, "許可されていない Origin です")
+            self._error(403, "Origin is not allowed")
             return
         self.send_response(HTTPStatus.NO_CONTENT)
         self._cors()
@@ -196,7 +196,7 @@ class ActorHandler(BaseHTTPRequestHandler):
     def _require_token(self) -> None:
         if not self._token_ok():
             raise PermissionError(
-                "API トークンが必要です（X-Actor-Token または Authorization: Bearer ヘッダー）"
+                "API token required (send X-Actor-Token or Authorization: Bearer)"
             )
 
     def _cors(self) -> None:
@@ -256,7 +256,7 @@ class ActorHandler(BaseHTTPRequestHandler):
 
     def _route(self, method: str) -> None:
         if not self._valid_host():
-            self._error(400, "不正な Host ヘッダーです")
+            self._error(400, "Invalid Host header")
             return
         parsed = urllib.parse.urlparse(self.path)
         path = urllib.parse.unquote(parsed.path)
@@ -265,28 +265,28 @@ class ActorHandler(BaseHTTPRequestHandler):
             if path.startswith("/api/"):
                 if method in {"POST", "PUT", "DELETE"}:
                     if not self._origin_allowed():
-                        raise PermissionError("許可されていない Origin です")
+                        raise PermissionError("Origin is not allowed")
                     content_type = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
                     if content_type != "application/json":
-                        self._error(415, "変更系 API は Content-Type: application/json が必要です")
+                        self._error(415, "Mutating endpoints require Content-Type: application/json")
                         return
                 # CORS preflight は認証ヘッダーを送れないため除外。実リクエストは全APIを保護。
                 if method != "OPTIONS" and self.settings.room_token:
                     self._require_token()
                 handler = self._api_route(method, path, query)
                 if handler is None:
-                    self._error(404, f"エンドポイントが見つかりません: {method} {path}")
+                    self._error(404, f"Endpoint not found: {method} {path}")
                     return
                 handler()
                 return
             if method != "GET":
-                self._error(405, "GET のみ対応しています")
+                self._error(405, "GET requests only")
                 return
             self._serve_static(path)
         except ValueError as exc:
             self._error(400, str(exc))
         except FileNotFoundError as exc:
-            self._error(404, str(exc) or "見つかりません")
+            self._error(404, str(exc) or "Not found")
         except PermissionError as exc:
             self._error(403, str(exc))
         except KeyError as exc:
@@ -294,7 +294,7 @@ class ActorHandler(BaseHTTPRequestHandler):
         except FileExistsError as exc:
             self._error(409, str(exc))
         except ProviderError as exc:
-            self._error(exc.status or 502, f"Gemini API エラー: {exc}")
+            self._error(exc.status or 502, f"Gemini API error: {exc}")
         except BrokenPipeError:
             self.close_connection = True
         except Exception as exc:  # pragma: no cover
@@ -433,11 +433,11 @@ class ActorHandler(BaseHTTPRequestHandler):
         body = self._body()
         key = str(body.get("api_key") or "").strip()
         if not key:
-            raise ValueError("api_key は必須です")
+            raise ValueError("api_key is required")
         if any(ch.isspace() for ch in key):
-            raise ValueError("API キーに空白が含まれています（コピーし直してください）")
+            raise ValueError("API key contains whitespace; copy it again without spaces")
         if len(key) < 20:
-            raise ValueError("API キーが短すぎます（Google AI Studio で発行したキーを貼り付けてください）")
+            raise ValueError("API key is too short; paste a key issued by Google AI Studio")
 
         settings = self.settings
         path = write_api_key(settings, key)
@@ -459,7 +459,7 @@ class ActorHandler(BaseHTTPRequestHandler):
                 if models:
                     check = {"ok": True, "models": models[:20], "model_known": settings.model in models}
                 else:
-                    check = {"ok": False, "error": "モデル一覧を取得できませんでした（キー / ネットワークを確認）"}
+                    check = {"ok": False, "error": "Could not fetch model catalog (check the API key and network)"}
             except ProviderError as exc:
                 check = {"ok": False, "error": str(exc)}
             if not check.get("ok"):
@@ -525,7 +525,7 @@ class ActorHandler(BaseHTTPRequestHandler):
     def api_skill_show(self, name: str, query: dict[str, list[str]]) -> None:
         skill = self.engine.library.get(slugify(name))
         if skill is None:
-            raise KeyError(f"スキル '{name}' が見つかりません")
+            raise KeyError(f"Skill '{name}' not found")
         payload = skill.to_dict()
         if (query.get("full") or ["1"])[0] in {"1", "true", "yes"}:
             from .prompt import estimate_tokens
@@ -539,7 +539,7 @@ class ActorHandler(BaseHTTPRequestHandler):
         body = self._body()
         name = str(body.get("name") or "").strip()
         if not name:
-            raise ValueError("name は必須です")
+            raise ValueError("name is required")
         instructions = str(body.get("instructions") or body.get("body") or "")
         description = str(body.get("description") or "")
         meta = {k: body[k] for k in ("version", "license", "tags", "allowed-tools") if k in body}
@@ -561,14 +561,14 @@ class ActorHandler(BaseHTTPRequestHandler):
     def api_skill_delete(self, name: str) -> None:
         deleted = self.engine.library.delete(name)
         if not deleted:
-            raise KeyError(f"スキル '{name}' が見つかりません")
+            raise KeyError(f"Skill '{name}' not found")
         self._json({"deleted": slugify(name)})
 
     def api_skill_draft(self) -> None:
         body = self._body()
         request = str(body.get("request") or "").strip()
         if not request:
-            raise ValueError("request は必須です")
+            raise ValueError("request is required")
         draft = self.engine.draft_skill(request, context=str(body.get("context") or ""))
         self._json({"draft": draft.to_dict(), "markdown": draft.to_markdown()})
 
@@ -594,7 +594,7 @@ class ActorHandler(BaseHTTPRequestHandler):
     def api_session_create(self) -> None:
         body = self._body()
         session = self.engine.store.create(
-            title=str(body.get("title") or "新しい会話"),
+            title=str(body.get("title") or "New chat"),
             skills=[str(s) for s in body.get("skills", [])],
             model=self.settings.model,
         )
@@ -607,7 +607,7 @@ class ActorHandler(BaseHTTPRequestHandler):
 
     def api_session_delete(self, session_id: str) -> None:
         if not self.engine.store.delete(session_id):
-            raise KeyError(f"セッション '{session_id}' が見つかりません")
+            raise KeyError(f"Session '{session_id}' not found")
         self._json({"deleted": session_id})
 
     # -- ルーム（常駐ボット用の共有ログ） --
@@ -619,7 +619,7 @@ class ActorHandler(BaseHTTPRequestHandler):
         body = self._body()
         name = str(body.get("name") or DEFAULT_ROOM).strip()
         if not RoomStore.valid_name(name):
-            raise ValueError("ルーム名は英数字・ハイフン・アンダースコア 32 文字以内にしてください")
+            raise ValueError("Room names must be at most 32 characters and contain only letters, numbers, hyphens, or underscores")
         store = self.rooms
         existed = store.get(name) is not None
         room = store.get_or_create(name, skills=[str(s) for s in body.get("skills", [])])
@@ -633,13 +633,13 @@ class ActorHandler(BaseHTTPRequestHandler):
         with_data = (query.get("attachments") or ["0"])[0] not in {"0", "false", ""}
         room = self.rooms.get(name)
         if room is None:
-            raise KeyError(f"ルーム '{name}' が見つかりません")
+            raise KeyError(f"Room '{name}' not found")
         self._json(room.to_dict(after=after, limit=limit, include_attachment_data=with_data))
 
     def api_room_delete(self, name: str) -> None:
         self._require_token()
         if not self.rooms.delete(name):
-            raise KeyError(f"ルーム '{name}' が見つかりません")
+            raise KeyError(f"Room '{name}' not found")
         self._json({"deleted": name})
 
     def api_room_post(self, name: str) -> None:
@@ -648,7 +648,7 @@ class ActorHandler(BaseHTTPRequestHandler):
         body = self._body()
         text = str(body.get("text") or "").strip()
         if not text:
-            raise ValueError("text は必須です")
+            raise ValueError("text is required")
         store = self.rooms
         room = store.get_or_create(name, skills=[str(s) for s in body.get("skills", [])])
         role = "assistant" if body.get("role") in {"assistant", "bot", "model"} else "user"
@@ -689,7 +689,7 @@ class ActorHandler(BaseHTTPRequestHandler):
         if not raw:
             return []
         if not isinstance(raw, list):
-            raise ValueError("attachments は配列で送ってください")
+            raise ValueError("attachments must be an array")
         limit = self.settings.max_attachment_bytes
         prepared: list[dict[str, Any]] = []
         for item in raw[: self.settings.max_attachments]:
@@ -699,8 +699,8 @@ class ActorHandler(BaseHTTPRequestHandler):
             size = int(item.get("size") or 0) or (len(data) * 3) // 4
             if size > limit:
                 raise ValueError(
-                    f"添付 '{item.get('name') or 'file'}' が大きすぎます"
-                    f"（{size / 1048576:.1f}MB / 上限 {limit / 1048576:.0f}MB）"
+                    f"Attachment '{item.get('name') or 'file'}' is too large"
+                    f" ({size / 1048576:.1f} MB; limit {limit / 1048576:.0f} MB)"
                 )
             prepared.append({
                 "name": str(item.get("name") or "file"),
@@ -751,13 +751,13 @@ class ActorHandler(BaseHTTPRequestHandler):
     def _chat_args(self, body: dict[str, Any]) -> tuple[Any, str, list[str], bool | None, list[dict[str, Any]]]:
         message = str(body.get("message") or "").strip()
         if not message:
-            raise ValueError("message は必須です")
+            raise ValueError("message is required")
         session_id = str(body.get("session_id") or "").strip()
         if session_id:
             session = self.engine.store.require(session_id)
         else:
             session = self.engine.store.create(
-                title=str(body.get("title") or "新しい会話"),
+                title=str(body.get("title") or "New chat"),
                 skills=[str(s) for s in body.get("skills", [])],
                 model=self.settings.model,
             )
@@ -828,7 +828,7 @@ class ActorHandler(BaseHTTPRequestHandler):
             path = "/index.html"
         target = (WEB_DIR / path.lstrip("/")).resolve()
         if not str(target).startswith(str(WEB_DIR.resolve())):
-            self._error(403, "参照できません")
+            self._error(403, "Access denied")
             return
         if target.is_dir():
             target = target / "index.html"
@@ -838,7 +838,7 @@ class ActorHandler(BaseHTTPRequestHandler):
             if index.is_file() and "." not in posixpath.basename(path):
                 target = index
             else:
-                self._error(404, f"見つかりません: {path}")
+                self._error(404, f"Not found: {path}")
                 return
         content_type = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
         if content_type.startswith("text/") or content_type in {"application/javascript", "application/json"}:
@@ -872,21 +872,21 @@ def run_server(settings: Settings, open_browser: bool = False, quiet: bool = Fal
     except ValueError:
         pass
     if not loopback and not settings.room_token:
-        print("外部インターフェースへの bind には ACTOR_ROOM_TOKEN が必要です")
+        print("ACTOR_ROOM_TOKEN is required when binding to a non-loopback interface")
         return 2
     engine = ChatEngine(settings)
     try:
         httpd = ActorServer((settings.host, settings.port), engine, quiet=quiet)
     except OSError as exc:
-        print(f"ポート {settings.port} で待ち受けできません: {exc}")
+        print(f"Cannot listen on port {settings.port}: {exc}")
         return 1
 
     url = f"http://127.0.0.1:{settings.port}/"
-    print(f"Actor サーバー起動: {url}")
-    print(f"  プロバイダ : {engine.provider.name}"
-          + ("  (シミュレータ: GEMINI_API_KEY 未設定)" if engine.provider.is_mock else f" / {engine.provider.model}"))
-    print(f"  スキル     : {len(engine.library)} 件 ({', '.join(str(d) for d in engine.library.dirs)})")
-    print("  Ctrl-C で停止")
+    print(f"Actor server listening at {url}")
+    print(f"  Provider    : {engine.provider.name}"
+          + ("  (simulator: GEMINI_API_KEY not set)" if engine.provider.is_mock else f" / {engine.provider.model}"))
+    print(f"  Skills      : {len(engine.library)} ({', '.join(str(d) for d in engine.library.dirs)})")
+    print("  Press Ctrl-C to stop")
 
     if open_browser:
         try:
@@ -896,7 +896,7 @@ def run_server(settings: Settings, open_browser: bool = False, quiet: bool = Fal
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
-        print("\n停止します…")
+        print("\nShutting down…")
     finally:
         httpd.server_close()
     return 0

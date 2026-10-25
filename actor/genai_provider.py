@@ -16,7 +16,7 @@
             temperature=0.85,
         ),
     )
-    response = chat.send_message("こんにちは。")
+    response = chat.send_message("Hello.")
     print(response.text)
 
 Actor では「ターンごとにスキル（system_instruction）とパラメータを差し替える」ため、
@@ -97,7 +97,7 @@ class GenAiProvider(Provider):
     def _api_key(self) -> str:
         key = self.keys.current or self.settings.api_key
         if not key:
-            raise ProviderError("GEMINI_API_KEY（または --api-key）が必要です。")
+            raise ProviderError("GEMINI_API_KEY or --api-key is required.")
         return key
 
     def _load(self, api_key: str | None = None) -> Any:
@@ -106,8 +106,8 @@ class GenAiProvider(Provider):
             from google.genai import types
         except ImportError as exc:  # pragma: no cover - 依存未導入
             raise ProviderError(
-                "google-genai SDK が見つかりません。`pip install google-genai` を実行するか、"
-                "追加依存なしの `--provider gemini` をお使いください。"
+                "google-genai SDK not found. Install it with `pip install google-genai`, or "
+                "Use `--provider gemini` to avoid this optional dependency."
             ) from exc
         self._types = types
         key = api_key or self._api_key()
@@ -142,7 +142,7 @@ class GenAiProvider(Provider):
                     "kind": "model_fallback",
                     "from": chain[0],
                     "to": ready[0],
-                    "text": f"{chain[0]} は全キーが 429 のため {ready[0]} で試します",
+                    "text": f"{chain[0]} has all keys rate-limited; trying {ready[0]} instead.",
                 })
                 chain = ready + rest
         return chain, notices
@@ -183,10 +183,10 @@ class GenAiProvider(Provider):
                     "kind": "model_fallback",
                     "from": model,
                     "to": next_model,
-                    "text": f"{model} で全キーが 429 → {next_model} に逃がします",
+                    "text": f"{model} has all keys rate-limited; falling back to {next_model} instead.",
                 })
         if last_error is None:  # pragma: no cover - ロジック上ほぼ起きない
-            last_error = ProviderError("リクエストに失敗しました")
+            last_error = ProviderError("Request failed.")
         if last_error.status in ROTATE_STATUSES and pool.size:
             raise ProviderError(
                 pool.exhaustion_message(status=last_error.status, last_error=last_error, models=models),
@@ -309,7 +309,7 @@ class GenAiProvider(Provider):
         **kwargs: Any,
     ) -> dict[str, Any]:
         if not messages:
-            raise ProviderError("送信するメッセージがありません")
+            raise ProviderError("No messages to send.")
         requested = self._model(model)
 
         def invoke(name: str, client: Any) -> Any:
@@ -337,7 +337,7 @@ class GenAiProvider(Provider):
         **kwargs: Any,
     ) -> Iterator[dict[str, Any]]:
         if not messages:
-            raise ProviderError("送信するメッセージがありません")
+            raise ProviderError("No messages to send.")
         requested = self._model(model)
         usage: dict[str, Any] = {}
         try:
