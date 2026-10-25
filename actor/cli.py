@@ -52,7 +52,7 @@ class C:
     MAGENTA = "\033[35m" if _supports_color() else ""
 
 
-BANNER = f"""{C.CYAN}{C.BOLD}Actor{C.RESET} {C.DIM}v{__version__} — Gemini chat powered by SKILL.md{C.RESET}
+BANNER = f"""{C.CYAN}{C.BOLD}Actor-si{C.RESET} {C.DIM}v{__version__} — Gemini chat powered by SKILL.md{C.RESET}
 {C.DIM}Type /help for commands or /exit to quit.{C.RESET}"""
 
 HELP_TEXT = f"""{C.BOLD}Chat{C.RESET}
@@ -133,7 +133,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="actor",
         description="Chat with Gemini using SKILL.md as the system instruction",
     )
-    parser.add_argument("--version", action="version", version=f"Actor {__version__}")
+    parser.add_argument("--version", action="version", version=f"Actor-si {__version__}")
     sub = parser.add_subparsers(dest="command")
 
     chat = sub.add_parser("chat", help="Interactive chat (default)")
@@ -1474,7 +1474,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     library = SkillLibrary(settings.skills_dirs)
     engine = ChatEngine(settings, library=library)
     ok = True
-    print(f"{C.BOLD}Actor doctor{C.RESET}")
+    print(f"{C.BOLD}Actor-si doctor{C.RESET}")
     print(f"  python          : {sys.version.split()[0]}")
     print(f"  actor           : {__version__} ({Path(__file__).parent})")
     print(f"  Dependencies      : None (Python standard library only)")

@@ -22,7 +22,7 @@ The CLI and web interface chrome, built-in tool descriptions, and application st
 
 ## Project and code map
 
-Actor-si is a local-first CLI, HTTP API, web UI, and resident bot that loads `SKILL.md` instructions and can call the Gemini API. The core uses only Python's standard library. The Google SDK backend is optional; the built-in simulator supports offline development.
+Actor-si is the product name; `actor` is the CLI command. The project is a local-first CLI, HTTP API, web UI, and resident bot that loads `SKILL.md` instructions and can call the Gemini API. The core uses only Python's standard library. The Google SDK backend is optional; the built-in simulator supports offline development.
 
 - CLI and packaging: `actor/cli.py`, `pyproject.toml`
 - HTTP API and browser UI: `actor/server.py`, `actor/web/`
@@ -68,7 +68,7 @@ The default skill tests are format-only: they inspect output templates and asser
 - Room tokens are accepted through `X-Actor-Token`, `X-Room-Token`, or `Authorization: Bearer`; query-string tokens are not accepted.
 - Content Security Policy restricts `frame-ancestors` to `'self'`. Set a room token before exposing the server beyond loopback, and configure host/origin allowlists for the deployment.
 - Keep runtime data in ignored `.actor/` files or a local secret store. Do not commit credentials, private account data, or personal email addresses.
-- Use GitHub's noreply address for authored commits. GitHub-generated merge commits may reflect the account's email-privacy setting, which only an authorized account owner can change. Do not rewrite merged history to alter attribution.
+- Use GitHub's noreply address for authored commits. The account's “Keep my email addresses private” and email-exposure push protection settings are enabled; already-published commit attribution remains public and must not be rewritten.
 
 ## Portable skill packages
 
@@ -76,17 +76,17 @@ The default skill tests are format-only: they inspect output templates and asser
 - ZIPs are reproducible for identical inputs. HTML comments are removed from prose but preserved inside fenced and indented code examples.
 - `principles.md` and the MIT `LICENSE` are required in the source and packaged resources; tests verify the canonical and packaged copies stay synchronized.
 - Lint checks the same archive variant selected for export. If using `--keep-allowed-tools`, pass it to both lint and export.
-- Lint is a conservative approximation, not a safety guarantee or marketplace approval. Review the complete ZIP and warnings manually.
+- Lint is a conservative approximation, not a safety guarantee or marketplace approval. Review the complete ZIP and warnings manually. Japanese privacy advice should not trigger concealment findings; explicit concealment from the user and concealment paired with sending, uploading, or execution should remain detectable.
 - Binary references, hidden files, caches, tests, and dependencies are excluded. A root source `LICENSE` is replaced by the canonical bundled MIT license, so it is not an omitted-reference warning. Actor does not submit skills or operate external accounts.
 - English bundled skill descriptions state both `Use when` and `Do not use when`; keep that boundary in the description of new English skills. Japanese skill files are maintained separately.
 
 ## Release and change constraints
 
-- PR #5 contains the merged security fixes. PR #6 added the English source edition and opt-in Japanese localization; PR #7 translated the CLI and UI chrome; PR #8 addressed the lint, packaging, auth-header, and positioning review findings. All four are merged.
-- Release notes for `v0.2.1` are maintained in [`docs/release-notes-v0.2.1.md`](docs/release-notes-v0.2.1.md). Creating a release tag or GitHub Release requires explicit maintainer approval; before publishing, confirm the reviewed changes are on `main`, the project version is correct, and the tag/release does not already exist.
-- Preserve the published `v0.2.0` tag and release. Do not rewrite published history or force-push.
+- PRs #5–#9 are merged: security hardening; English source and opt-in Japanese skills; English CLI/UI; lint, packaging, auth-header and positioning follow-ups; and finalized v0.2.1 release notes.
+- The annotated `v0.2.1` tag and GitHub Release are published from `main`; release notes are in [`docs/release-notes-v0.2.1.md`](docs/release-notes-v0.2.1.md). For future releases, confirm the reviewed changes are on `main`, the project version is correct, and the tag/release does not already exist; publishing requires explicit maintainer approval.
+- Preserve the published `v0.2.0` tag and Release, including its body. Do not rewrite published history or force-push.
 - Do not modify `examples/mika` unless explicitly asked.
 - Keep Sponsors links in `FUNDING.md`; do not add them to `LISTING.md` or skill ZIPs.
 - Do not submit packages to third-party services or change GitHub settings without explicit authorization.
 - [`LISTING.md`](LISTING.md) is a draft and has not been verified against live third-party hosts. Do not claim host compatibility until tested.
-- Repository About/Topics could not be changed due to an integration permission error; do not retry without updated authorization.
+- Repository About/Topics have been configured manually. The current GitHub integration cannot write repository metadata; use GitHub settings or reconnect with appropriate permissions for future changes.

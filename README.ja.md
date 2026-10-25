@@ -1,8 +1,8 @@
-# Actor
+# Actor-si
 
 [![Tests](https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si/actions/workflows/tests.yml/badge.svg)](https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si/actions/workflows/tests.yml)
 
-Actor-si は、Agent Skills の作成・lint・テスト・パッケージ化をローカルで行うワークベンチです。CLI・HTTP API・Web UI から `SKILL.md` を system instruction として読み込み、Gemini で実行できます。コア機能は Python 標準ライブラリだけで動き、スキルの自動選択、参照資料との合成、実行前の形式チェックに対応します。サーバーは既定で loopback に bind し、外部 bind には API トークンが必要です。ブラウザーからの別 Origin アクセスは明示 allowlist がない限り無効です。
+Actor-si（CLIコマンドは `actor`）は、Agent Skills の作成・lint・テスト・パッケージ化をローカルで行うワークベンチです。CLI・HTTP API・Web UI から `SKILL.md` を system instruction として読み込み、Gemini で実行できます。コア機能は Python 標準ライブラリだけで動き、スキルの自動選択、参照資料との合成、実行前の形式チェックに対応します。サーバーは既定で loopback に bind し、外部 bind には API トークンが必要です。ブラウザーからの別 Origin アクセスは明示 allowlist がない限り無効です。
 
 ## 概要
 
@@ -10,7 +10,7 @@ Actor-si は、Agent Skills の作成・lint・テスト・パッケージ化を
 CLI・HTTP API・Web UI（Gemini 風の `/` 呼び出し UI）の3つを、**Python 標準ライブラリだけで**提供します。
 
 Google が Gemini に導入した「スキル」は、Markdown ネイティブなオープン標準 **SKILL.md** を採用しています。
-Actor はその形式のフォルダをそのまま読み込み、
+Actor-si はその形式のフォルダをそのまま読み込み、
 
 - スキルを **複数スタック**して1つの `system_instruction` に合成
 - 依頼文からスキルを **自動選択**（決定的なスコアリング・閾値つき）
@@ -25,7 +25,7 @@ Actor はその形式のフォルダをそのまま読み込み、
 ```
 ┌────────────┐   /skills/<name>/SKILL.md    ┌──────────────┐
 │  CLI       │──┐                           │ system_      │
-│  Web UI    │──┼──▶ Actor (SkillEngine) ──▶│ instruction  │──▶ Gemini API
+│  Web UI    │──┼──▶ Actor-si ───────────────▶│ instruction  │──▶ Gemini API
 │  HTTP API  │──┘     選択・合成・保存      │ (+ 参照資料) │
 └────────────┘                              └──────────────┘
 ```
@@ -51,7 +51,7 @@ lint は ZIP の配置、メタデータ、ファイル種別・サイズ、資�
 python3 -m actor skills export minutes-writer --target agensi -o minutes-writer.zip
 ```
 
-エクスポートは共有 principles と正規の MIT `LICENSE` を含む、再現可能なスキル単体 ZIP を作ります。ZIP 全体を確認し、提出先を選んで自分で提出してください。Actor がアップロード・公開・提出を行うことはありません。
+エクスポートは共有 principles と正規の MIT `LICENSE` を含む、再現可能なスキル単体 ZIP を作ります。ZIP 全体を確認し、提出先を選んで自分で提出してください。Actor-si がアップロード・公開・提出を行うことはありません。
 
 ### 同梱の5つのスキル
 
@@ -63,7 +63,7 @@ python3 -m actor skills export minutes-writer --target agensi -o minutes-writer.
 
 ### 提供しないもの
 
-Actor-si はホスト型サービスではありません。同梱スキル自体が外部システムを操作したり、コンテンツを提出したりすることもありません。ユーザーが提供した材料をもとにテキストを作成・支援します。Actor の任意ネットワークツールは既定で無効で、使う場合も明示的な有効化が必要です。外部サービスを直接操作するスキルは同梱していません。
+Actor-si はホスト型サービスではありません。同梱スキル自体が外部システムを操作したり、コンテンツを提出したりすることもありません。ユーザーが提供した材料をもとにテキストを作成・支援します。Actor-si の任意ネットワークツールは既定で無効で、使う場合も明示的な有効化が必要です。外部サービスを直接操作するスキルは同梱していません。
 
 ## 30秒で試す
 
@@ -113,7 +113,7 @@ python3 -m actor key add --env           # .env の GEMINI_API_KEYS に追記す
 
 ```console
 $ python3 -m actor key show
-[伏せ字] （/home/user/Actor/.actor/api_key）
+[伏せ字] （/home/user/Actor-si/.actor/api_key）
 プロバイダ: gemini / モデル: gemini-3-flash / キー 2 本（2/2 本が使用可能）
 
 $ python3 -m actor key list                 # 全部のキーと状態（429 の残り時間つき）
@@ -137,7 +137,7 @@ Web UI の 🔑 にも「N キー（空き M）/ 429 で K 回切替」が出ま
 ### 429（Quota exceeded）が発生したとき
 
 プレビュー版のモデルは無料枠だと `429 ResourceExhausted / Quota exceeded` がよく出ます。
-Actor は **キー → モデル** の順に逃げ道を用意しています（どちらも自動・必ず表示されます）。
+Actor-si は **キー → モデル** の順に逃げ道を用意しています（どちらも自動・必ず表示されます）。
 
 **① まずキーを替える。** 複数のキーを持たせておけば、その回のリクエストを次のキーへ回します。
 
@@ -186,7 +186,7 @@ $ python3 -m actor key sources
 ```
 
 - **Vertex AI エクスプレスモード**（新規 Cloud ユーザー・90 日無料・課金設定なし）は API キーで使える別枠です。
-  `ACTOR_BASE_URL=https://aiplatform.googleapis.com` を設定すれば Actor が API の形（`v1` /
+  `ACTOR_BASE_URL=https://aiplatform.googleapis.com` を設定すれば Actor-si が API の形（`v1` /
   `publishers/google/models/{model}`）を自動で合わせます
 - ⚠️ 複数アカウントで制限を回避するのは規約違反です。無料枠では送信内容が製品改善に使われ得るため、
   機密は送らないでください（詳しくは [docs/keys.md](docs/ja/keys.md)）
@@ -228,7 +228,7 @@ curl -s -X POST localhost:8080/api/rooms/actor-x/messages \
 python3 -m actor rooms show actor-x
 ```
 
-- ボットは **Actor の完全なインスタンス**（スキル・会話履歴・モデル設定をローカルに持つ）。ルームは合流点
+- ボットは **Actor-si の完全なインスタンス**（スキル・会話履歴・モデル設定をローカルに持つ）。ルームは合流点
 - **SKILL.md を編集すると次のターンから反映**される（動かしたままペルソナを育てられる）
 - ルームは追記専用の JSON ログ。`after=<seq>` で差分ポーリングするので、どこからでも合流できる
 - 立ち上げ方は端末・nohup・systemd・cron・タスクスケジューラまで → **[docs/bot.md](docs/ja/bot.md)**
@@ -314,10 +314,10 @@ curl -s -X POST localhost:8080/api/rooms/actor-x/messages \
 
 ```
 $ python3 -m actor
-🎭 Actor v0.2.1 — SKILL.md 駆動の Gemini 対話クライアント
+🎭 Actor-si v0.2.1 — SKILL.md 駆動の Gemini 対話クライアント
 /help でコマンド一覧、/exit で終了。
 シミュレータで動作中 — GEMINI_API_KEY を設定すると本物の Gemini に切り替わります。
-スキル 5 件 / 保存先 /path/to/Actor/.actor
+スキル 5 件 / 保存先 /path/to/Actor-si/.actor
 
 you [-,auto|think] › コミットログからリリースノートを書いて
 ▶ 適用スキル: release-notes(15.0)
@@ -547,7 +547,7 @@ actor/
 skills/          サンプル: minutes-writer, code-review, release-notes, brand-voice, skill-author
 examples/mika/   常駐ボット用ペルソナの例（temperature 0.85）
 docs/bot.md      常駐ボット運用ガイド（systemd / cron / 複数ボット）
-docs/skills-compat.md  SKILL.md 互換メモ（allowed-tools など Actor 独自キー）
+docs/skills-compat.md  SKILL.md 互換メモ（allowed-tools など Actor-si 独自キー）
 docs/keys.md      複数キーと 429 の自動切り替え（設定・コマンド・設計）
 HANDOFF.md       引き継ぎ資料（全体像・運用手順・現在地）
 tests/           unittest + portable skill / security checks + optional UI smoke tests
@@ -573,7 +573,7 @@ kill "$server_pid"
 
 ## セキュリティと注意
 
-- スキルは **ローカルの Markdown** です。Actor はスキル内のスクリプトを実行しません（内容を `system_instruction` に渡すだけ）。Gemini 側もアップロードされたスクリプトを実行しません
+- スキルは **ローカルの Markdown** です。Actor-si はスキル内のスクリプトを実行しません（内容を `system_instruction` に渡すだけ）。Gemini 側もアップロードされたスクリプトを実行しません
 - 社外秘をスキルに入れないでください。スキルの本文・参照資料は API へ送信されます
 - 生成された議事録などをそのまま社外へ出す前に、人が確認してください（サンプルスキルにも「要確認」を残す指示を書いています）
 - サーバーは既定で `127.0.0.1` に bind します。LAN / 外部へ bind する場合は `ACTOR_ROOM_TOKEN` を必ず設定してください。未設定なら起動を拒否します。
@@ -613,9 +613,9 @@ chat = client.chats.create(
 response = chat.send_message("こんにちは。")
 ```
 
-Actor での対応:
+Actor-si での対応:
 
-| 参考コード | Actor |
+| 参考コード | Actor-si |
 | --- | --- |
 | `load_skill_prompt("./skills/mika/SKILL.md")` | `SkillLibrary(...).get("mika")` → 複数スキルを1つの `system_instruction` に合成 |
 | `config=temperature=0.85` | SKILL.md の frontmatter に `temperature: 0.85` と書く |

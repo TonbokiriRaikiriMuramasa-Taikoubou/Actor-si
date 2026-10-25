@@ -2,9 +2,9 @@
 
 ## 0.2.1 — security, compatibility, and skills workbench
 
-- Add a local workflow to draft, lint, test, and export portable Agent Skills; Actor does not upload or submit packages.
+- Add a local workflow to draft, lint, test, and export portable Agent Skills; Actor-si does not upload or submit packages.
 - Translate the CLI and web UI chrome into English while keeping the Japanese skill edition opt-in.
-- Fix token-authenticated Web UI chat when callers pass custom request headers.
+- Fix token-authenticated Web UI streaming: `/api/chat/stream` now retains the room token when callers supply custom headers.
 - Require JSON content types and same-origin/allowlisted Origins for API mutations; stop accepting query-string tokens and restrict frame ancestors.
 - Lint the exact portable ZIP, including `--keep-allowed-tools`; refine Japanese concealment detection and suppress the unnecessary root-LICENSE warning.
 - Preserve code examples while removing prose HTML comments; restore variable template headings for meeting minutes and code reviews, and recognize `<...>` placeholders in live output checks.
