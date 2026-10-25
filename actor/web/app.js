@@ -631,7 +631,7 @@ async function sendMessage(textOverride) {
     };
     const res = await fetch('/api/chat/stream', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify(payload),
       signal: state.abort.signal,
     });

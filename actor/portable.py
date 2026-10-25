@@ -81,6 +81,42 @@ def _yaml_scalar(value: Any) -> str:
     return json.dumps(str(value), ensure_ascii=False)
 
 
+def _strip_html_comments_outside_fences(text: str) -> str:
+    """Remove author comments from Markdown prose, preserving fenced examples verbatim."""
+    output: list[str] = []
+    prose: list[str] = []
+    fence_char = ""
+    fence_size = 0
+
+    def flush_prose() -> None:
+        if not prose:
+            return
+        output.append(re.sub(r"<!--.*?-->", "", "".join(prose), flags=re.DOTALL))
+        prose.clear()
+
+    for line in text.splitlines(keepends=True):
+        plain = line.rstrip("\r\n")
+        marker = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", plain)
+        if fence_char:
+            output.append(line)
+            if (marker and marker.group(1)[0] == fence_char
+                    and len(marker.group(1)) >= fence_size and not marker.group(2).strip()):
+                fence_char = ""
+                fence_size = 0
+        elif marker:
+            flush_prose()
+            output.append(line)
+            fence_char = marker.group(1)[0]
+            fence_size = len(marker.group(1))
+        elif line.startswith("    ") or line.startswith(chr(9)):
+            flush_prose()
+            output.append(line)
+        else:
+            prose.append(line)
+    flush_prose()
+    return "".join(output)
+
+
 def _portable_document(skill: Skill, keep_allowed_tools: bool = False) -> str:
     original_metadata = skill.meta.get("metadata") if isinstance(skill.meta.get("metadata"), dict) else {}
     source_meta: dict[str, Any] = {"source": SOURCE_URL}
@@ -109,7 +145,7 @@ def _portable_document(skill: Skill, keep_allowed_tools: bool = False) -> str:
             lines.append(f"  {key}: {_yaml_scalar(value)}")
     lines.append("---")
 
-    body = re.sub(r"<!--.*?-->", "", skill.instructions, flags=re.DOTALL).strip()
+    body = _strip_html_comments_outside_fences(skill.instructions).strip()
     greeting = skill.meta.get("greeting")
     if greeting:
         body = f"## First response\nUse this greeting for the first reply: {greeting}\n\n{body}".strip()
@@ -192,6 +228,11 @@ _PROMPT_INJECTION = (
     r"(?i)(?:send|upload|exfiltrate|execute|run)\b.{0,80}\bwithout (?:telling|notifying|informing) (?:the )?user",
     r"(?:前の|以前の)指示を無視",
     r"(?:ユーザーに伝えない|ユーザーには知らせずに|ユーザーに知らせずに|ユーザーに黙って|秘密裏に(?:送信|実行)|こっそり(?:送信|実行)|知らせずに送信|隠して(?:実行|送信|おく))",
+    r"(?i)\b(?:without (?:the user's )?knowledge|without consent|undisclosed|under the radar)\b",
+    r"(?i)\b(?:silently|secretly|covertly)\s+(?:upload|transmit|exfiltrate|execute|run)",
+    r"(?:ユーザーに)?(?:知らせないで|伝えないで|通知しないで|報告しないで)",
+    r"(?:黙って|無断で|秘密裏に|こっそり)(?:アップロード|送信|実行|実行する|起動)",
+    r"(?:報告|通知|連絡)せず(?:に)?(?:実行|アップロード|送信|実行する)",
 )
 
 
@@ -290,10 +331,10 @@ def _lint_archive(skill: Skill, archive_data: bytes, skipped: list[str] | None =
     return LintReport(skill.name, score, not failed and score >= 80, findings, external_urls, external_domains)
 
 
-def lint_skill(skill: Skill) -> LintReport:
+def lint_skill(skill: Skill, keep_allowed_tools: bool = False) -> LintReport:
     """Build and scan the exact ZIP payload that would be exported for this skill."""
     try:
-        files, skipped = _portable_files(skill)
+        files, skipped = _portable_files(skill, keep_allowed_tools=keep_allowed_tools)
         archive_data = _write_deterministic_zip(files)
     except (OSError, ValueError) as exc:
         finding = Finding("packaging", "fail", str(exc))
@@ -301,8 +342,8 @@ def lint_skill(skill: Skill) -> LintReport:
     return _lint_archive(skill, archive_data, skipped)
 
 
-def lint_skills(skills: Iterable[Skill]) -> list[LintReport]:
-    return [lint_skill(skill) for skill in skills]
+def lint_skills(skills: Iterable[Skill], keep_allowed_tools: bool = False) -> list[LintReport]:
+    return [lint_skill(skill, keep_allowed_tools=keep_allowed_tools) for skill in skills]
 
 
 def export_zip(skills: Iterable[Skill], keep_allowed_tools: bool = False,

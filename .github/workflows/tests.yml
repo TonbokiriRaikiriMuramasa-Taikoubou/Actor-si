@@ -102,3 +102,36 @@ jobs:
         run: python -m actor skills test
       - name: Export portable minutes-writer
         run: python -m actor skills export minutes-writer --target agensi -o /tmp/minutes-writer.zip
+
+  ui-smoke:
+    runs-on: ubuntu-latest
+    env:
+      NO_PROXY: localhost,127.0.0.1,::1
+      ACTOR_ROOM_TOKEN: ui-smoke-test-token
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install jsdom for the optional UI smoke test
+        run: npm install --no-save --package-lock=false jsdom
+      - name: Start token-protected server
+        run: |
+          python -m actor serve --port 8080 --skills-dir skills > /tmp/actor-ui.log 2>&1 &
+          echo $! > /tmp/actor-ui.pid
+          for i in $(seq 1 30); do
+            if curl -fsS -H "X-Actor-Token: $ACTOR_ROOM_TOKEN" http://127.0.0.1:8080/api/health -o /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/actor-ui.log
+          exit 1
+      - name: Run UI smoke with API token
+        run: node tests/ui_smoke.mjs
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -f /tmp/actor-ui.pid ]; then kill "$(cat /tmp/actor-ui.pid)" || true; fi
+          cat /tmp/actor-ui.log

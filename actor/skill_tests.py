@@ -1,4 +1,4 @@
-"""Skill output-contract tests. Simulator mode inspects format specs only; it does not fake model output."""
+"""Skill output-contract tests. Format-only mode inspects specs; it does not fake model output."""
 from __future__ import annotations
 
 import json
@@ -58,6 +58,18 @@ def _spec_headings(spec: str) -> list[str]:
     return headings
 
 
+def _assertion_matches(output: str, assertion: str) -> bool:
+    """Treat angle-bracket values in template assertions as non-empty placeholders."""
+    pieces: list[str] = []
+    cursor = 0
+    for placeholder in re.finditer(r"<[^<>]+>", assertion):
+        pieces.append(re.escape(assertion[cursor:placeholder.start()]))
+        pieces.append(r"[^\r\n]+?")
+        cursor = placeholder.end()
+    pieces.append(re.escape(assertion[cursor:]))
+    return re.search("".join(pieces), output) is not None
+
+
 def _load_cases(skill: Any) -> list[dict[str, Any]]:
     cases_path = skill.root / "tests" / "cases.yaml"
     if not cases_path.is_file():
@@ -104,7 +116,7 @@ def run_cases(library: SkillLibrary, names: list[str] | None = None, *, live: bo
                 elif event.get("type") == "done":
                     final = event
             output = "".join(pieces)
-            missing_from_output = [expected_text for expected_text in expected if expected_text not in output]
+            missing_from_output = [expected_text for expected_text in expected if not _assertion_matches(output, expected_text)]
             used_simulator = bool(final.get("simulated"))
             if used_simulator:
                 missing_from_output.append("configured provider returned simulator output instead of a live response")

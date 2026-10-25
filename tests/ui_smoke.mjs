@@ -1,14 +1,16 @@
 // Actor Web UI のスモークテスト（任意・開発用）
 //
-//   1) 依存を入れる:  npm install --no-save jsdom
-//   2) サーバー起動:  python3 -m actor serve --port 8080
-//   3) 実行:          node tests/ui_smoke.mjs
+//   1) 依存を入れる:  npm install --no-save --package-lock=false jsdom
+//   2) サーバー起動:  ACTOR_ROOM_TOKEN=ui-smoke-test-token python3 -m actor serve --port 8080
+//   3) 実行:          ACTOR_ROOM_TOKEN=ui-smoke-test-token node tests/ui_smoke.mjs
 //
 // 実サーバーに対して jsdom で UI を起動し、スキル一覧・「/」呼び出し・
 // SSE ストリーミング・インスペクタ・スキル生成までを検証する。
 import { JSDOM, VirtualConsole } from 'jsdom';
 
 const BASE = process.env.BASE || 'http://127.0.0.1:8080';
+const AUTH_TOKEN = process.env.ACTOR_ROOM_TOKEN || '';
+const apiRequests = [];
 const errors = [];
 const vc = new VirtualConsole();
 vc.on('jsdomError', (e) => errors.push(`jsdomError: ${e.message}`));
@@ -19,11 +21,26 @@ const dom = await JSDOM.fromURL(`${BASE}/`, {
   resources: 'usable',
   pretendToBeVisual: true,
   virtualConsole: vc,
+  beforeParse(window) {
+    if (AUTH_TOKEN) window.localStorage.setItem('actor.roomToken', AUTH_TOKEN);
+  },
 });
 
 const { window } = dom;
-// Node の fetch / DOM API を注入（jsdom には無い）
-window.fetch = (input, init) => fetch(typeof input === 'string' ? new URL(input, BASE) : input, init);
+// Node の fetch / DOM API を注入（jsdom には無い）。UI の API 要求ヘッダーも記録する。
+window.fetch = (input, init = {}) => {
+  const url = typeof input === 'string' ? new URL(input, BASE)
+    : input instanceof URL ? input : new URL(input.url);
+  if (url.pathname.startsWith('/api/')) {
+    apiRequests.push({ path: url.pathname, headers: new Headers(init.headers || {}) });
+  }
+  return fetch(url, init);
+};
+const serverFetch = (input, init = {}) => {
+  const headers = new Headers(init.headers || {});
+  if (AUTH_TOKEN) headers.set('X-Actor-Token', AUTH_TOKEN);
+  return fetch(input, { ...init, headers });
+};
 window.TextDecoder = TextDecoder;
 window.ReadableStream = ReadableStream;
 // performance は jsdom 標準のものを利用
@@ -65,6 +82,10 @@ check('オートコンプリート: 確定で入力欄に挿入', $('#input').va
 $('#input').value = '会議の文字起こしから議事録を作って';
 await window.sendMessage();
 for (let i = 0; i < 100 && $('#messages').textContent.includes('送信中'); i++) await wait(100);
+const streamRequest = apiRequests.find((request) => request.path === '/api/chat/stream');
+check('チャット: トークン設定時に認証ヘッダーを送る',
+      !AUTH_TOKEN || streamRequest?.headers.get('X-Actor-Token') === AUTH_TOKEN,
+      AUTH_TOKEN ? (streamRequest?.headers.get('X-Actor-Token') ? 'header present' : 'header missing') : 'tokenless mode');
 
 const msgs = $$('#messages .msg');
 check('送信: ユーザー + アシスタントの2件', msgs.length === 2, `${msgs.length} 件`);
@@ -128,6 +149,11 @@ check('スキル生成: 本文にテンプレート見出し', $('#draft-body').
 $('#save-skill').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
 await wait(500);
 check('スキル保存: サイドバーへ反映', $$('#skill-list li').length >= 6, `${$$('#skill-list li').length} 件`);
+const draftName = $('#draft-name').value;
+const deletedDraft = await serverFetch(`${BASE}/api/skills/${encodeURIComponent(draftName)}`, {
+  method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+});
+check('スキル生成: smoke test のスキルを後片付けする', deletedDraft.ok);
 
 // セッション一覧タブ
 const tabs = $$('.sidebar .tabs .tab');
@@ -140,8 +166,8 @@ check('履歴タブ: セッションが並ぶ', $$('#session-list li').length >=
 // ====================================================================
 // API キー（🔑 から保存できる）
 // ====================================================================
-const configBefore = await (await fetch(`${BASE}/api/config`)).json();
-const keyBefore = await (await fetch(`${BASE}/api/key`)).json();
+const configBefore = await (await serverFetch(`${BASE}/api/config`)).json();
+const keyBefore = await (await serverFetch(`${BASE}/api/key`)).json();
 check('APIキー: /api/config は生のキーを返さない', typeof configBefore.api_key === 'boolean',
       `api_key=${typeof configBefore.api_key} source=${configBefore.api_key_source || '-'}`);
 
@@ -151,13 +177,13 @@ check('APIキー: 🔑 でパネルが開く', !$('#key-box').classList.contains
 check('APIキー: 状態が出どころつきで表示される', /設定済み|未設定/.test($('#key-status').textContent),
       $('#key-status').textContent);
 
-const tooShort = await fetch(`${BASE}/api/key`, {
+const tooShort = await serverFetch(`${BASE}/api/key`, {
   method: 'POST', headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ api_key: 'short' }),
 });
 check('APIキー: 短すぎるキーは 400 で拒否される', tooShort.status === 400,
       (await tooShort.json()).error);
-const keyAfter = await (await fetch(`${BASE}/api/key`)).json();
+const keyAfter = await (await serverFetch(`${BASE}/api/key`)).json();
 check('APIキー: 拒否時は保存されない', keyAfter.has_key === keyBefore.has_key,
       `has_key=${keyAfter.has_key}`);
 
@@ -197,11 +223,11 @@ check('添付: 送信後に入力欄のチップが消える', $$('#attach-chips
 check('添付: ユーザーの発言にファイル名が出る', [...$$('#messages .msg.user')].some((m) => m.textContent.includes('test.png')));
 
 // サーバー側に base64 が保存されているか（API を直接確認）
-const sessions = await (await fetch(`${BASE}/api/sessions`)).json();
+const sessions = await (await serverFetch(`${BASE}/api/sessions`)).json();
 const sessionId = sessions.sessions[0]?.id;
 let storedAttachment = null;
 if (sessionId) {
-  const detail = await (await fetch(`${BASE}/api/sessions/${sessionId}`)).json();
+  const detail = await (await serverFetch(`${BASE}/api/sessions/${sessionId}`)).json();
   for (const m of detail.session.messages) {
     storedAttachment = (m.attachments || [])[0] || storedAttachment;
   }
@@ -228,7 +254,7 @@ await wait(300);
 check('ルーム: 発言が表示される', $$('#messages .msg').length === 1, `${$$('#messages .msg').length} 件`);
 
 // サーバー側 reply でボットの返事を積む（常駐ボット相当）
-await fetch(`${BASE}/api/rooms/${roomName}/messages`, {
+await serverFetch(`${BASE}/api/rooms/${roomName}/messages`, {
   method: 'POST', headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ text: 'ミカ、今日のタスクを整理して', reply: true }),
 });
@@ -244,7 +270,10 @@ check('ルーム: 返事にスキルチップが出る', [...roomMsgs].some((m) 
 $('#room-leave').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
 await wait(200);
 check('ルーム: 会話モードに戻れる', $('#room-banner').classList.contains('hidden'));
-await fetch(`${BASE}/api/rooms/${roomName}`, { method: 'DELETE' });
+const deletedRoom = await serverFetch(`${BASE}/api/rooms/${roomName}`, {
+  method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+});
+check('ルーム: smoke test のルームを後片付けする', deletedRoom.ok);
 
 check('JS 実行時エラーなし', errors.length === 0, errors.slice(0, 3).join(' | '));
 dom.window.close();

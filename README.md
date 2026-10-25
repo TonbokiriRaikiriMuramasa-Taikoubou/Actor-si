@@ -251,7 +251,7 @@ python3 -m actor rooms say "この図を見て" --attach ./図.png --reply   # �
 
 ## Portable Agent Skills / Agensi
 
-`actor skills lint --target agensi` でローカル検査し、`actor skills export <name> --target agensi -o <name>.zip` で1スキル単位のZIPを作れます。Lintは公開スキャナーの近似で、審査通過を保証しません。提出・アカウント操作は行わず、ZIPを確認したうえで作者が手動で提出してください。詳細は [docs/agensi.md](docs/agensi.md) と [docs/skills-compat.md](docs/skills-compat.md)、変更履歴は [CHANGELOG.md](CHANGELOG.md) と [v0.2.0 リリースノート案](docs/release-notes-v0.2.0.md) を参照してください。
+`actor skills lint --target agensi` でローカル検査し、`actor skills export <name> --target agensi -o <name>.zip` で1スキル単位のZIPを作れます。Lintは公開スキャナーの近似で、審査通過を保証しません。提出・アカウント操作は行わず、ZIPを確認したうえで作者が手動で提出してください。詳細は [docs/agensi.md](docs/agensi.md) と [docs/skills-compat.md](docs/skills-compat.md)、変更履歴は [CHANGELOG.md](CHANGELOG.md)、[v0.2.1 セキュリティ修正リリースノート](docs/release-notes-v0.2.1.md)、[v0.2.0 リリースノート](docs/release-notes-v0.2.0.md) を参照してください。
 
 ## ルームのトークン保護と Webhook
 
@@ -281,7 +281,7 @@ curl -s -X POST localhost:8080/api/rooms/actor-x/messages \
 
 ```
 $ python3 -m actor
-🎭 Actor v0.2.0 — SKILL.md 駆動の Gemini 対話クライアント
+🎭 Actor v0.2.1 — SKILL.md 駆動の Gemini 対話クライアント
 /help でコマンド一覧、/exit で終了。
 シミュレータで動作中 — GEMINI_API_KEY を設定すると本物の Gemini に切り替わります。
 スキル 5 件 / 保存先 /path/to/Actor/.actor
@@ -526,9 +526,9 @@ tests/           unittest + portable skill / security checks + optional UI smoke
 python3 -m unittest discover -s tests -v      # full unit suite（依存ゼロ / google-genai があれば SDK 経路も検証）
 
 # UI のスモークテスト（任意・要 Node）
-npm install --no-save jsdom
-python3 -m actor serve --port 8080 &
-node tests/ui_smoke.mjs
+npm install --no-save --package-lock=false jsdom
+ACTOR_ROOM_TOKEN=ui-smoke-test-token python3 -m actor serve --port 8080 &
+ACTOR_ROOM_TOKEN=ui-smoke-test-token node tests/ui_smoke.mjs
 ```
 
 ## セキュリティと注意
