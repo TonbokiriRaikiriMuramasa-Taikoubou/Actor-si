@@ -1,4 +1,4 @@
-/* Actor — Web UI (依存なし / 単一ファイル) */
+/* Actor — Web UI (zero dependencies / single bundle) */
 :root {
   --bg: #0b0d13;
   --bg-soft: #12151f;
@@ -49,7 +49,7 @@ kbd {
 .hidden { display: none !important; }
 .mono { font-family: var(--mono); }
 
-/* ---------- レイアウト ---------- */
+/* ---------- Layout ---------- */
 .app {
   display: grid;
   grid-template-columns: 288px minmax(0, 1fr) 340px;
@@ -65,7 +65,7 @@ kbd {
   .sidebar { display: none; }
 }
 
-/* ---------- サイドバー ---------- */
+/* ---------- Sidebar ---------- */
 .sidebar {
   display: flex; flex-direction: column; gap: 12px;
   padding: 16px 14px;
@@ -116,7 +116,7 @@ kbd {
 }
 .pill.sim { color: #ffe1a8; border-color: #6b5520; background: #3a2f13; }
 
-/* ---------- ボタン / 入力 ---------- */
+/* ---------- Buttons / inputs ---------- */
 .btn {
   font: inherit; cursor: pointer; color: var(--text); background: var(--bg-card);
   border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 7px 12px;
@@ -145,7 +145,7 @@ kbd {
 .switch input { accent-color: var(--accent); }
 .switch:hover { color: var(--text); }
 
-/* ---------- メイン ---------- */
+/* ---------- Main ---------- */
 .main { display: flex; flex-direction: column; min-width: 0; height: 100vh; }
 .topbar {
   display: flex; align-items: center; gap: 10px; padding: 10px 16px;
@@ -216,7 +216,7 @@ kbd {
 .content hr { border: 0; border-top: 1px solid var(--line); margin: 1em 0; }
 .content h2, .content h3, .content h4 { margin-top: 1em; }
 
-/* ---------- 入力 ---------- */
+/* ---------- Composer ---------- */
 .composer-wrap { position: relative; padding: 8px 18px 14px; }
 .composer {
   max-width: 900px; margin: 0 auto; display: flex; gap: 8px; align-items: flex-end;
@@ -241,7 +241,7 @@ kbd {
 .autocomplete .item .d { color: var(--muted); font-size: .76rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .autocomplete .item .s { margin-left: auto; font-size: .7rem; color: var(--warn); }
 
-/* ---------- インスペクタ ---------- */
+/* ---------- Inspector ---------- */
 .inspector {
   border-left: 1px solid var(--line); background: rgba(18, 21, 31, .72);
   display: flex; flex-direction: column; padding: 12px; gap: 10px; overflow: hidden;
@@ -262,7 +262,7 @@ pre.system {
 .score-bar { height: 5px; border-radius: 3px; background: var(--bg-soft); overflow: hidden; margin-top: 4px; }
 .score-bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-3)); }
 
-/* ---------- モーダル ---------- */
+/* ---------- Modals ---------- */
 .modal {
   position: fixed; inset: 0; background: rgba(4, 6, 12, .72); backdrop-filter: blur(3px);
   display: grid; place-items: center; z-index: 100; padding: 20px;
@@ -289,13 +289,13 @@ pre.system {
 .toast.err { border-color: #64303c; color: #ffd7dd; }
 @keyframes rise { from { opacity: 0; transform: translate(-50%, 8px); } }
 
-/* スクロールバー */
+/* Scrollbar */
 ::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-thumb { background: #2c3350; border-radius: 9px; }
 ::-webkit-scrollbar-thumb:hover { background: #3a4260; }
 ::-webkit-scrollbar-track { background: transparent; }
 
-/* ---------- ルーム ---------- */
+/* ---------- Rooms ---------- */
 .row { display: flex; gap: 6px; }
 .row .input { flex: 1; }
 .room-banner {
@@ -306,7 +306,7 @@ pre.system {
 .msg.room-user .avatar { background: linear-gradient(135deg, #2b3d61, #2a4a63); }
 .msg .msg-meta { font-size: .72rem; color: var(--muted); font-family: var(--mono); }
 
-/* 添付（画像 / PDF） */
+/* Attachments (images / PDFs) */
 .hidden-file { display: none; }
 .attachments { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 12px 0; }
 .attach-chip {
@@ -321,7 +321,7 @@ pre.system {
 .composer .attach { padding: 6px 10px; }
 .input.token.small { width: 120px; font-size: 12px; padding: 3px 8px; }
 
-/* ツール呼び出し */
+/* Tool calls */
 .tool-line {
   margin: 4px 0; padding: 4px 10px; border-left: 2px solid #6c7cf0;
   background: rgba(108, 124, 240, .08); border-radius: 0 6px 6px 0;
@@ -330,7 +330,7 @@ pre.system {
 }
 .tool-line.err { border-color: #f06c6c; background: rgba(240, 108, 108, .08); color: #ffb9b9; }
 
-/* API キー欄 */
+/* API key panel */
 .btn.wide { width: 100%; margin-top: 6px; }
 .key-box {
   margin-top: 8px; padding: 10px; border-radius: 10px;

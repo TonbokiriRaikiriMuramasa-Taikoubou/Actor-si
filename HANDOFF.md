@@ -18,16 +18,19 @@ English is the default source edition. Japanese documentation and skills are mai
 
 Japanese skills are opt-in with `--skills-dir i18n/ja/skills`. Keep the procedure and checklist order aligned between locales, and update each locale's output-format cases when its template changes. Skill headings are fixed by that edition's output contract; write the response body in the user's language.
 
+The CLI and web interface chrome, built-in tool descriptions, and application status/error messages are in English. This does not translate skill instructions, user-provided content, or model responses; those follow the selected skill and the user's language.
+
 ## Project and code map
 
 Actor-si is a local-first CLI, HTTP API, web UI, and resident bot that loads `SKILL.md` instructions and can call the Gemini API. The core uses only Python's standard library. The Google SDK backend is optional; the built-in simulator supports offline development.
 
 - CLI and packaging: `actor/cli.py`, `pyproject.toml`
 - HTTP API and browser UI: `actor/server.py`, `actor/web/`
-- Chat and provider backends: `actor/chat.py`, `actor/providers.py`
-- Skill loading and prompt composition: `actor/skills.py`, `actor/prompt.py`
+- Chat and provider backends: `actor/chat.py`, `actor/providers.py`, `actor/genai_provider.py`
+- Key management and tools: `actor/keys.py`, `actor/tools.py`
+- Skills, prompt composition, and output-format tests: `actor/skills.py`, `actor/prompt.py`, `actor/skill_tests.py`
+- Resident rooms and bot: `actor/rooms.py`, `actor/bot.py`, `actor/sessions.py`
 - Portable ZIP lint and export: `actor/portable.py`
-- Output-format contract tests: `actor/skill_tests.py`
 - Shared English principles: `skills/_house/principles.md`
 - Shared Japanese principles: `i18n/ja/skills/_house/principles.md`
 
@@ -38,7 +41,8 @@ For task-specific details, see [`docs/bot.md`](docs/bot.md), [`docs/keys.md`](do
 Run from the repository root:
 
 ```sh
-# Full standard-library test suite
+# Syntax check and full standard-library test suite
+python -m compileall -q actor tests
 python -m unittest discover -s tests -q
 
 # English default skills

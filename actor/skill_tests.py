@@ -134,7 +134,7 @@ def run_cases(library: SkillLibrary, names: list[str] | None = None, *, live: bo
             passed = bool(specified_headings) and not missing_from_assertions and not stale_assertions
             results.append({
                 "skill": skill.name, "case": case["name"], "check_type": "format-only",
-                "passed": passed, "message": "形式の検査のみ。モデル出力は生成していません。",
+                "passed": passed, "message": "Format-only check; no model output was generated.",
                 "spec_headings": specified_headings,
                 "missing_from_assertions": missing_from_assertions, "stale_assertions": stale_assertions,
                 "output": None,

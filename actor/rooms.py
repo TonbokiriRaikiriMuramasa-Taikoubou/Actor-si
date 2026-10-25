@@ -125,7 +125,7 @@ class RoomStore:
     def path_of(self, name: str) -> Path:
         if not ROOM_NAME_RE.match(name or ""):
             raise ValueError(
-                "ルーム名は英数字・ハイフン・アンダースコア 32 文字以内にしてください"
+                "Room names must be at most 32 characters and contain only letters, numbers, hyphens, and underscores."
             )
         return self.directory / f"{name}.json"
 
@@ -164,7 +164,7 @@ class RoomStore:
     def require(self, name: str) -> Room:
         room = self.get(name)
         if room is None:
-            raise KeyError(f"ルーム '{name}' が見つかりません")
+            raise KeyError(f"Room '{name}' not found.")
         return room
 
     def save(self, room: Room) -> Room:

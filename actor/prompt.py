@@ -1,7 +1,6 @@
-"""スキル群を Gemini の ``system_instruction`` へ組み立てる。
+"""Compose selected skills into a Gemini ``system_instruction``.
 
-Gemini の Skills は「1つの会話に複数のスキルを重ねられる」のが特徴なので、
-Actor も複数スキルを決定的な順序で 1 つの system_instruction に合成する。
+Actor combines multiple skills in a deterministic order so they can guide one conversation together.
 """
 
 from __future__ import annotations
@@ -10,9 +9,8 @@ from typing import Any, Iterable, Sequence
 
 from .skills import DEFAULT_MEDIA_LIMIT, DEFAULT_INLINE_LIMIT, Skill
 
-CATALOG_HEADER = """## 利用できるスキル（カタログ）
-あなたは下記のスキルを追加で使える。今回の依頼に合うものがあれば、
-「そのスキルの手順に従った」と一言添えたうえで、その手順に沿って回答してよい。
+CATALOG_HEADER = """## Available skills
+You may also use the skills listed below. If one is relevant to the request, follow its instructions and briefly note that you did so.
 
 {catalog}
 """
@@ -24,7 +22,7 @@ def catalog_block(skills: Iterable[Skill], exclude: Sequence[str] = ()) -> str:
     for skill in sorted(skills, key=lambda s: s.name):
         if skill.name in excluded:
             continue
-        desc = skill.description or "(説明なし)"
+        desc = skill.description or "(No description)"
         lines.append(f"- `{skill.name}`: {desc}")
     if not lines:
         return ""
@@ -39,18 +37,18 @@ def compose_system_text(
     with_catalog: bool = False,
     inline_limit: int = DEFAULT_INLINE_LIMIT,
 ) -> str:
-    """system_instruction のテキスト部分を組み立てる。"""
+    """Build the text portion of the system instruction."""
     blocks: list[str] = []
     if preamble.strip():
         blocks.append(preamble.strip())
 
     if skills:
         names = ", ".join(s.name for s in skills)
-        blocks.append(f"## 適用中のスキル: {names}")
+        blocks.append(f"## Active skills: {names}")
         for skill in skills:
             blocks.append(skill.instruction_block(inline_limit=inline_limit))
     else:
-        blocks.append("## 適用中のスキル: なし\n（スキルを指定する場合は、ユーザーに `/スキル名` の入力を促してください）")
+        blocks.append("## Active skills: none\nIf the user wants to apply a skill, ask them to enter `/skill-name`.")
 
     if with_catalog and all_skills:
         catalog = catalog_block(all_skills, exclude=[s.name for s in skills])
@@ -58,10 +56,11 @@ def compose_system_text(
             blocks.append(catalog)
 
     blocks.append(
-        "## 出力の作法\n"
-        "- スキルに指定された出力形式があれば必ずそれに従う。\n"
-        "- スキルの手順を省略した場合は、省略した事実を明示する。\n"
-        "- 不明な点は推測で埋めず、ユーザーに質問する。"
+        "## Response guidelines\n"
+        "- Follow any output format specified by an active skill.\n"
+        "- If you skip a required step, state that clearly.\n"
+        "- Do not guess when information is missing; ask the user.\n"
+        "- Write the response body in the user's language."
     )
     return "\n\n".join(blocks)
 

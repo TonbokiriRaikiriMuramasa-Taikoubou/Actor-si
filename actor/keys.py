@@ -67,41 +67,41 @@ KEY_SOURCES: tuple[dict[str, str], ...] = (
     {
         "name": "Google AI Studio",
         "url": "https://aistudio.google.com/apikey",
-        "kind": "無料枠",
-        "note": "クレジットカード不要。Flash / Flash-Lite / 2.5 Pro などが無料枠で使える。"
-                "枠は「プロジェクト × モデル」単位（キーを増やしても同じプロジェクトでは増えない）",
+        "kind": "Free tier",
+        "note": "No credit card required. Flash, Flash-Lite, and 2.5 Pro models may be available on the free tier. "
+                "Quotas are per project and model; adding keys does not increase a project quota.",
     },
     {
-        "name": "Vertex AI（Gemini Enterprise Agent Platform）エクスプレスモード",
+        "name": "Vertex AI (Gemini Enterprise Agent Platform) Express Mode",
         "url": "https://console.cloud.google.com/expressmode",
-        "kind": "90 日無料",
-        "note": "新しい Google Cloud ユーザーは課金設定なしで 90 日無料（枠内）。API キーで使えて、"
-                "ACTOR_BASE_URL=https://aiplatform.googleapis.com を設定すると Actor からそのまま使える",
+        "kind": "90-day free access",
+        "note": "New Google Cloud users may get 90 days of free access within the applicable limits, without billing setup. It supports API keys; "
+                "set ACTOR_BASE_URL=https://aiplatform.googleapis.com to use it with Actor.",
     },
     {
-        "name": "Google Cloud 無料トライアル",
+        "name": "Google Cloud free trial",
         "url": "https://cloud.google.com/free/docs/free-cloud-features",
-        "kind": "クレジット",
-        "note": "新規顧客向け $300 / 90 日。課金設定（カード）が必要。Vertex AI 経由で使う",
+        "kind": "Credit",
+        "note": "$300 for 90 days for eligible new customers. Billing setup and a payment card are required. Use through Vertex AI.",
     },
     {
-        "name": "組織・Workspace の管理者",
+        "name": "Organization or Workspace administrator",
         "url": "",
-        "kind": "社内の枠",
-        "note": "会社や学校の Google Workspace にプロジェクトがある場合、そこからキーを発行できることがある",
+        "kind": "Organization access",
+        "note": "Your organization may be able to issue a key if it has a Google Workspace project.",
     },
     {
-        "name": "Google for Startups / 研究・学生プログラム",
+        "name": "Google for Startups / research and student programs",
         "url": "https://cloud.google.com/startup",
-        "kind": "クレジット",
-        "note": "スタートアップ・研究者・学生向けのクレジットプログラム。条件と審査あり",
+        "kind": "Credit",
+        "note": "Credit programs for startups, researchers, and students; eligibility requirements and review apply.",
     },
 )
 
 #: やってはいけないこと（表示・ドキュメントで必ず一緒に出す）
 KEY_SOURCES_CAUTION = (
-    "注意: 複数アカウントを作って制限を回避するのは規約違反です（BAN され得ます）。"
-    "また、無料枠では送信内容が Google の製品改善に使われ得るので、機密は送らないでください。"
+    "Caution: Creating multiple accounts to bypass limits violates the terms and may result in account suspension. "
+    "Content sent through free tiers may be used to improve Google products; do not send confidential information."
 )
 
 #: 1 ファイルとして読む上限（壊れたファイルで固まらないように）
@@ -115,11 +115,11 @@ _RETRY_DELAY_RE = re.compile(r"([0-9]+(?:\.[0-9]+)?)s")
 # 伏せ字・指紋・パース
 # ----------------------------------------------------------------------
 def mask_key(api_key: str) -> str:
-    """``AIzaSy…abcd`` のように伏せる（ログ・画面表示はこれを使う）。"""
+    """Mask a key (for example, ``prefix…suffix``); use this in logs and displays."""
     if not api_key:
         return ""
     if len(api_key) <= 10:
-        return "＊" * len(api_key)
+        return "*" * len(api_key)
     return f"{api_key[:6]}…{api_key[-4:]}"
 
 
@@ -187,10 +187,10 @@ class KeyEntry:
     def source_label(self) -> str:
         return self.label or {
             "cli": "--api-key",
-            "env": "環境変数",
+            "env": "environment variable",
             ".env": ".env",
-            "file": "保存ファイル",
-            "keys": "keys ディレクトリ",
+            "file": "saved file",
+            "keys": "keys directory",
         }.get(self.source, self.source)
 
     def to_dict(self) -> dict[str, Any]:
@@ -517,7 +517,7 @@ class KeyPool:
     # 状態の更新
     # ------------------------------------------------------------------
     def _bump_model_totals(self, model: str, field: str) -> None:
-        name = model or self.model or "(モデル不明)"
+        name = model or self.model or "(unknown model)"
         bucket = self.by_model.setdefault(name, {"requests": 0, "limits": 0})
         bucket[field] = bucket.get(field, 0) + 1
 
@@ -641,7 +641,7 @@ class KeyPool:
                 if not (state.uses or state.errors or state.limits or state.limited_until):
                     continue          # 何も起きていない記録は出さない
                 state_wait = self.limited_for(entry.value, key_name)
-                models_detail[key_name or "(モデル指定なし)"] = {
+                models_detail[key_name or "(any model)"] = {
                     "status": state.status,
                     "wait": round(state_wait, 1),
                     "limits": state.limits,
@@ -650,7 +650,7 @@ class KeyPool:
                 }
             limited_elsewhere = sorted(
                 display for display, detail in models_detail.items()
-                if detail["limited"] and display not in {name or "(モデル指定なし)"}
+                if detail["limited"] and display not in {name or "(any model)"}
             )
             items.append({
                 **entry.to_dict(),
@@ -682,7 +682,7 @@ class KeyPool:
             by_model = {
                 name: {"limits": state.limits, "uses": state.uses}
                 for name, state in sorted(
-                    ((name or "(モデル指定なし)", state)
+                    ((name or "(any model)", state)
                      for name, state in self._bucket(self.entries[item["index"]].value).items()),
                     key=lambda pair: pair[0],
                 )
@@ -738,9 +738,9 @@ class KeyPool:
     def summary(self, model: str | None = None) -> str:
         """``3/5 本が使用可能`` のような 1 行。モデルを渡せばそのモデルの数になる。"""
         if not self.entries:
-            return "キー未設定"
+            return "No API key configured"
         name = (self.model if model is None else model) or ""
-        return f"{self.ready_count_for(name)}/{self.size} 本が使用可能"
+        return f"{self.ready_count_for(name)}/{self.size} key(s) ready"
 
     def model_summary(self) -> list[tuple[str, str]]:
         """モデルごとの ``(モデル名, 何本使えるか)``（逃げ道があるときの表示用）。"""
@@ -754,27 +754,27 @@ class KeyPool:
         reason = ""
         if last_error is not None and str(last_error):
             first_line = redact(str(last_error), self.keys).splitlines()[0]
-            reason = f" / 最後のエラー: {first_line}"
-        tried_label = " / ".join(tried) if tried else "モデル不明"
-        lines = [f"すべての Gemini API キーが使えません（{count} 本すべて・試したモデル: {tried_label}{reason}）"]
+            reason = f" / last error: {first_line}"
+        tried_label = " / ".join(tried) if tried else "unknown model"
+        lines = [f"No Gemini API keys are currently available ({count} total; tried models: {tried_label}{reason})."]
         for index, entry in enumerate(self.entries):
             parts: list[str] = []
             for name in tried:
                 wait = self.limited_for(entry.value, name)
                 if wait > 0:
-                    parts.append(f"{name}: あと {wait:.0f} 秒")
-            detail = " / ".join(parts) if parts else "使用不可"
-            lines.append(f"  [{index}] {entry.masked}（{entry.source_label}）{detail}")
+                    parts.append(f"{name}: retry in {wait:.0f}s")
+            detail = " / ".join(parts) if parts else "unavailable"
+            lines.append(f"  [{index}] {entry.masked} ({entry.source_label}) {detail}")
         wait_all = self.next_available_in()
         if wait_all > 0:
-            lines.append(f"対処: {wait_all:.0f} 秒ほど待つか、別のキーを足してください（`python3 -m actor key add`）")
+            lines.append(f"Next step: wait about {wait_all:.0f}s or add another key (`python3 -m actor key add`).")
         else:
-            lines.append("対処: 別のキーを足してください（`python3 -m actor key add`）")
+            lines.append("Next step: add another key (`python3 -m actor key add`).")
         if status == 429:
-            lines.append("ヒント: Gemini の枠は「プロジェクト × モデル」単位です。"
-                         "キーを増やす（`actor key sources` に無料の用意先）か、"
-                         "別モデルへ逃がす `ACTOR_MODEL_FALLBACKS=<モデル名>` を使ってください。")
-        lines.append("状態の確認: `python3 -m actor key list` / 統計: `python3 -m actor key stats`")
+            lines.append("Tip: Gemini quotas are per project and model. "
+                         "Add another project key (see free options with `actor key sources`) or "
+                         "configure model fallbacks with `ACTOR_MODEL_FALLBACKS=<model-name>`.")
+        lines.append("Check status: `python3 -m actor key list` / statistics: `python3 -m actor key stats`")
         return "\n".join(lines)
 
     def health(self) -> dict[str, Any]:

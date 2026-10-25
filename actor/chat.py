@@ -1,4 +1,4 @@
-"""スキル選択 → system_instruction 合成 → Gemini 呼び出し を繋ぐエンジン。"""
+"""Engine that selects skills, composes system instructions, and calls Gemini."""
 
 from __future__ import annotations
 
@@ -71,20 +71,21 @@ class SkillDraft:
         return f"---\nname: {self.name}\ndescription: {self.description}\n---\n\n{self.instructions.strip()}\n"
 
 
-DRAFT_PROMPT = """あなたは SKILL.md（AI 向けの作業手順書）の設計者です。
-以下の依頼を再現可能なスキルとして書き起こしてください。
+DRAFT_PROMPT = """You design reusable Agent Skills in the SKILL.md format.
+Turn the request below into a clear, repeatable skill.
 
-# 依頼
+# Request
 {request}
 
 {context}
 
-# 出力ルール
-- 次の JSON だけを出力する。前後に説明文やコードフェンスを付けない。
-{{"name": "kebab-case-の英語名", "description": "40文字程度の説明", "instructions": "Markdown の手順書"}}
-- instructions には次を含めること: 目的 / 入力 / 手順（番号付き） / 出力フォーマット / 確認事項。
-- 手順は誰が実行しても同じ結果になるよう、具体的な動詞で書く。
-- 出力は日本語で書く。
+# Output rules
+- Return only this JSON object. Do not add explanation or code fences.
+{{"name": "kebab-case-name", "description": "Concise description with a Use when sentence", "instructions": "Markdown instructions"}}
+- Include these sections in instructions: Purpose, Input, Procedure (numbered steps), Output format, and Checklist.
+- Use specific, actionable verbs so different users can follow the same procedure.
+- Write the skill in the language used in the request. Keep required output headings explicit and consistent.
+- Do not invent requirements or facts that were not provided.
 """
 
 
@@ -263,14 +264,14 @@ class ChatEngine:
                     elif kind == "notice":
                         notices.append({k: v for k, v in event.items() if k != "type"})
                     elif kind == "error":
-                        error = event.get("text") or "エラーが発生しました"
+                        error = event.get("text") or "An error occurred."
                     yield event
                 text_parts.extend(round_text)
 
                 if not calls or error:
                     break
                 if round_index == self.settings.max_tool_rounds - 1:
-                    yield {"type": "tool_limit", "text": "ツール呼び出しの上限に達しました"}
+                    yield {"type": "tool_limit", "text": "Maximum tool-call rounds reached."}
                     break
 
                 # モデルの functionCall と、こちらの実行結果を履歴に足して次のラウンドへ
@@ -319,7 +320,7 @@ class ChatEngine:
             model=final_model,
             simulated=self.provider.is_mock,
         )
-        if session.title in {"", "新しい会話"}:
+        if session.title in {"", "New chat"}:
             session.title = session.auto_title()
         if persist:
             self.store.save(session)
@@ -355,8 +356,8 @@ class ChatEngine:
             raw_size = int(item.get("size") or 0) or (len(data) * 3) // 4
             if raw_size > limit:
                 raise ValueError(
-                    f"添付 '{item.get('name') or 'file'}' が大きすぎます"
-                    f"（{raw_size / 1048576:.1f}MB / 上限 {limit / 1048576:.0f}MB）"
+                    f"Attachment '{item.get('name') or 'file'}' is too large "
+                    f"({raw_size / 1048576:.1f} MB; limit {limit / 1048576:.0f} MB)"
                 )
             prepared.append({
                 "name": str(item.get("name") or "file"),
@@ -460,33 +461,33 @@ def parse_draft(text: str, fallback_request: str = "") -> SkillDraft:
     )
 
 
-_TEMPLATE = """# 目的
-{request} を、毎回同じ品質で実行する。
+_TEMPLATE = """# Purpose
+{request} consistently, using the same quality standards each time.
 
-# 入力
-- 対象のテキスト / ファイル / 依頼内容
-- 前提条件や制約（あれば）
+# Input
+- The relevant text, files, or task description.
+- Any assumptions, requirements, or constraints.
 
-# 手順
-1. 依頼のゴールと成果物の形式を確認する。
-2. 与えられた材料から必要な情報を洗い出す。
-3. 抜けや矛盾があれば、勝手に補わず質問する。
-4. 下記の出力フォーマットで成果物を作る。
-5. 最後に自己レビューし、指示とズレていないか確認する。
+# Procedure
+1. Confirm the goal and expected deliverable.
+2. Extract the information needed from the supplied material.
+3. Ask about gaps or contradictions instead of guessing.
+4. Produce the deliverable using the output format below.
+5. Review the result against the request and requirements.
 
-# 出力フォーマット
-## 結論
-（1〜3行で要約）
+# Output format
+## Summary
+Provide a concise summary.
 
-## 詳細
-（箇条書き。根拠となる材料を引用する）
+## Details
+Use bullets and cite supporting material.
 
-## 次のアクション
-- （誰が・何を・いつまでに）
+## Next steps
+List the owner, action, and due date when known.
 
-# 確認事項
-- 推測で埋めた箇所は「要確認」と明記する。
-- 不足情報があれば末尾に列挙する。
+# Checklist
+- Mark uncertain interpretations for confirmation.
+- List missing information at the end.
 """
 
 
@@ -496,10 +497,10 @@ def _mock_draft(request: str) -> SkillDraft:
     text = (request or "").strip()
     ascii_words = re.findall(r"[A-Za-z][A-Za-z0-9]{2,}", text)
     base = "-".join(w.lower() for w in ascii_words[:3]) or "custom-task"
-    description = (text.splitlines()[0] if text else "依頼から生成したスキル")[:80] or "依頼から生成したスキル"
+    description = (text.splitlines()[0] if text else "Skill generated from a request")[:80] or "Skill generated from a request"
     return SkillDraft(
         name=slugify(base),
         description=description,
-        instructions=_TEMPLATE.format(request=text.splitlines()[0] if text else "この作業"),
+        instructions=_TEMPLATE.format(request=text.splitlines()[0] if text else "the task"),
         source="template",
     )

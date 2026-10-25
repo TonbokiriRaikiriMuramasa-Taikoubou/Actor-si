@@ -53,7 +53,7 @@ class Message:
 @dataclass
 class Session:
     id: str
-    title: str = "新しい会話"
+    title: str = "New chat"
     skills: list[str] = field(default_factory=list)      # 明示選択されたスキル
     auto_skills: list[str] = field(default_factory=list)  # 自動選択されたスキル
     model: str = ""
@@ -116,7 +116,7 @@ class Session:
     def from_dict(cls, data: dict[str, Any]) -> "Session":
         session = cls(
             id=str(data.get("id") or new_session_id()),
-            title=str(data.get("title") or "新しい会話"),
+            title=str(data.get("title") or "New chat"),
             skills=[str(s) for s in data.get("skills", [])],
             auto_skills=[str(s) for s in data.get("auto_skills", [])],
             model=str(data.get("model") or ""),
@@ -151,10 +151,10 @@ class SessionStore:
 
     def path_of(self, session_id: str) -> Path:
         if not SESSION_ID_RE.match(session_id or ""):
-            raise ValueError("不正なセッションIDです")
+            raise ValueError("Invalid session ID.")
         return self.directory / f"{session_id}.json"
 
-    def create(self, title: str = "新しい会話", skills: Iterable[str] = (), model: str = "") -> Session:
+    def create(self, title: str = "New chat", skills: Iterable[str] = (), model: str = "") -> Session:
         session = Session(id=new_session_id(), title=title, skills=list(skills), model=model)
         self.save(session)
         return session
@@ -176,7 +176,7 @@ class SessionStore:
     def require(self, session_id: str) -> Session:
         session = self.get(session_id)
         if session is None:
-            raise KeyError(f"セッション '{session_id}' が見つかりません")
+            raise KeyError(f"Session '{session_id}' not found.")
         return session
 
     def save(self, session: Session) -> Session:

@@ -1,21 +1,19 @@
-"""常駐ボット（ルームを監視して、スキルを適用した返事を書き込む）。
+"""Resident bot that monitors a room and posts skill-guided replies.
 
-「自分だけの常駐ボット」の最小構成。ボットは **Actor の完全なインスタンス**として
-ローカルで動き、ルーム（共有ログ）を経由して人間とやり取りする。
+The bot runs as a local Actor instance and communicates through a shared room log.
 
-    # 端末1: サーバー（ルームを外から見えるようにする）
+    # Terminal 1: start the server
     python3 -m actor serve --port 8080
 
-    # 端末2: 常駐ボット（mika スキルを固定適用）
-    python3 -m actor bot --room actor-x --skills mika
+    # Terminal 2: start a bot with a pinned skill
+    python3 -m actor bot --room actor-x --skills minutes-writer
 
-    # 端末3: 話しかける
+    # Terminal 3: send a message
     curl -s -X POST localhost:8080/api/rooms/actor-x/messages \
-      -H 'Content-Type: application/json' -d '{"text":"おはよー"}'
+      -H 'Content-Type: application/json' -d '{"text":"Good morning"}'
     curl -s localhost:8080/api/rooms/actor-x?after=0 | jq '.messages[].text'
 
-ボットは SKILL.md をターンごとに読み直すので、**動かしたままスキルを編集**すると
-次の返事から反映される（persona の試行錯誤がしやすい）。
+The bot reloads SKILL.md for every turn, so edits take effect without restarting it.
 """
 
 from __future__ import annotations
@@ -42,10 +40,10 @@ __all__ = ["RoomBot", "run_bot"]
 
 
 # ----------------------------------------------------------------------
-# HTTP クライアント（標準ライブラリのみ）
+# HTTP client (standard library only)
 # ----------------------------------------------------------------------
 class RoomClient:
-    """ルーム API の薄いクライアント。"""
+    """Small client for the room API."""
 
     def __init__(self, base_url: str, timeout: float = 30.0, token: str = ""):
         self.base_url = base_url.rstrip("/")
@@ -70,7 +68,7 @@ class RoomClient:
                 pass
             raise RuntimeError(f"{method} {path} → {exc.code} {detail[:200]}") from exc
         except urllib.error.URLError as exc:
-            raise RuntimeError(f"{method} {path} → 接続できません: {exc.reason}") from exc
+            raise RuntimeError(f"{method} {path} → Could not connect: {exc.reason}") from exc
         return json.loads(body) if body else {}
 
     def health(self) -> dict[str, Any]:
@@ -81,7 +79,7 @@ class RoomClient:
 
     def messages(self, name: str, after: int = 0, attachments: bool = False) -> dict[str, Any]:
         query = {"after": after}
-        if attachments:  # 添付は base64 なので、必要なときだけ取り寄せる
+        if attachments:  # Attachments are base64-encoded, so fetch them only when needed.
             query["attachments"] = 1
         return self._request(
             "GET", f"/api/rooms/{urllib.parse.quote(name)}?{urllib.parse.urlencode(query)}"
@@ -106,7 +104,7 @@ class RoomClient:
 
 
 # ----------------------------------------------------------------------
-# ボット
+# Bot
 # ----------------------------------------------------------------------
 @dataclass
 class BotState:
@@ -116,7 +114,7 @@ class BotState:
 
 @dataclass
 class RoomBot:
-    """ルームを監視して返事を書き込む常駐プロセス。"""
+    """Resident process that monitors a room and posts replies."""
 
     settings: Settings
     room: str = DEFAULT_ROOM
@@ -127,11 +125,11 @@ class RoomBot:
     bot_name: str = "Actor"
     stream: bool = False
     once: bool = False
-    from_now: bool = False  # 起動時点より前の履歴には反応しない
+    from_now: bool = False  # Ignore history from before startup
     respond_to: str = "user"  # user | all
-    mention: str = ""  # 指定すると、その文字列を含む発言にだけ反応する
+    mention: str = ""  # When set, reply only to messages that contain this text
 
-    # 実行時
+    # Runtime state
     engine: ChatEngine | None = None
     client: RoomClient | None = None
     state: BotState = field(default_factory=BotState)
@@ -149,22 +147,22 @@ class RoomBot:
                 room = self.client.messages(self.room, after=0)
                 self.state.cursor = int(room.get("cursor") or 0)
                 if self.state.cursor:
-                    self.log(f"--from-now: 既存の {self.state.cursor} 件は読み飛ばします")
+                    self.log(f"--from-now: skipping {self.state.cursor} existing message(s)")
             except RuntimeError:
                 pass
         missing = [name for name in self.skills if self.engine.library.get(slugify(name)) is None]
         if missing:
-            self.log(f"警告: スキルが見つかりません: {', '.join(missing)}")
+            self.log(f"Warning: skills not found: {', '.join(missing)}")
         try:
             health = self.client.health()
             self.log(
-                f"接続OK: {self.api_base} (provider={health.get('provider')}, skills={health.get('skills')})"
+                f"Connected: {self.api_base} (provider={health.get('provider')}, skills={health.get('skills')})"
             )
         except RuntimeError as exc:
-            self.log(f"警告: サーバーに接続できません → {exc}")
+            self.log(f"Warning: could not connect to server → {exc}")
         self.client.ensure_room(self.room, self.skills)
 
-    # ---- 状態（カーソル）の永続化 ----
+    # ---- Persist state (cursor) ----
     @property
     def state_path(self) -> Path:
         return self.settings.data_dir / f"bot-{self.room}.json"
@@ -183,12 +181,12 @@ class RoomBot:
             encoding="utf-8",
         )
 
-    # ---- ログ ----
+    # ---- Logging ----
     def log(self, message: str) -> None:
         stamp = time.strftime("%H:%M:%S")
         print(f"[{stamp}] [bot:{self.room}] {message}", flush=True)
 
-    # ---- セッション ----
+    # ---- Sessions ----
     def session(self):
         assert self.engine is not None
         store = self.engine.store
@@ -212,7 +210,7 @@ class RoomBot:
         return session
 
     # ------------------------------------------------------------------
-    # 本体
+    # Main loop
     # ------------------------------------------------------------------
     def run(self) -> int:
         if self.engine is None or self.client is None:
@@ -220,16 +218,16 @@ class RoomBot:
         assert self.engine is not None and self.client is not None
 
         self._install_signal_handlers()
-        pinned = ", ".join(self.skills) or "（自動選択）"
+        pinned = ", ".join(self.skills) or "(auto-select)"
         self.log(
-            f"起動: room={self.room} / skills={pinned} / interval={self.interval}s / "
+            f"Started: room={self.room} / skills={pinned} / interval={self.interval}s / "
             f"cursor={self.state.cursor} / model={self.settings.model}"
-            + ("  [シミュレータ]" if self.engine.provider.is_mock else "")
+            + ("  [simulator]" if self.engine.provider.is_mock else "")
         )
-        print(f"[bot:{self.room}] 待ち受け中…（Ctrl-C で停止） 話しかけるには:", flush=True)
+        print(f"[bot:{self.room}] Listening… (press Ctrl-C to stop). Send a message with:", flush=True)
         print(
             f"  curl -s -X POST {self.api_base}/api/rooms/{self.room}/messages "
-            f"-H 'Content-Type: application/json' -d '{{\"text\":\"おはよう\"}}'",
+            f"-H 'Content-Type: application/json' -d '{{\"text\":\"Hello\"}}'",
             flush=True,
         )
 
@@ -241,27 +239,27 @@ class RoomBot:
             except RuntimeError as exc:
                 errors += 1
                 if errors <= 3 or errors % 20 == 0:
-                    self.log(f"通信エラー（リトライします）: {exc}")
+                    self.log(f"Network error (retrying): {exc}")
                 handled = 0
             except ProviderError as exc:
-                self.log(f"モデルエラー: {exc}")
+                self.log(f"Model error: {exc}")
                 handled = 0
             if self.once and handled >= 0:
                 return 0
             if not handled:
                 self._wait(self.interval)
-        self.log("停止しました。")
+        self.log("Stopped.")
         return 0
 
     def tick(self) -> int:
-        """1回ポーリングして、必要なら返事をする。処理した発言数を返す。"""
+        """Poll once and reply if needed. Return the number of messages processed."""
         assert self.client is not None
         try:
             payload = self.client.messages(self.room, after=self.state.cursor, attachments=True)
         except RuntimeError as exc:
-            # ルームが消えていたら作り直す（保存先を消した・別データで再起動した等）
+            # Recreate the room if it was deleted or the data directory changed.
             if " 404 " in str(exc) or "404 " in str(exc):
-                self.log("ルームが見つからないので作り直します")
+                self.log("Room not found; recreating it.")
                 self.client.ensure_room(self.room, self.skills)
                 self.state.cursor = 0
                 self._save_state()
@@ -286,7 +284,7 @@ class RoomBot:
             return False
         author = str(message.get("author") or "")
         if author and author == self.bot_name:
-            return False  # 自分の発言には反応しない
+            return False  # Ignore messages posted by this bot.
         text = str(message.get("text") or "")
         if not text.strip():
             return False
@@ -335,42 +333,42 @@ class RoomBot:
                     usage = event.get("usage", {})
                     model = event.get("model", "")
                     simulated = bool(event.get("simulated"))
-                    # done.tool_calls は {"name","args"} のリスト（ログ用に名前だけ取り出す）
+                    # done.tool_calls contains name/args objects; only log the names.
                     tools = [c.get("name", "") if isinstance(c, dict) else str(c)
                              for c in (event.get("tool_calls") or [])] or tools
         except ProviderError as exc:
-            self.log(f"生成に失敗しました: {exc}")
+            self.log(f"Generation failed: {exc}")
             self.client.post(
-                self.room, f"（エラー: {exc}）", role="assistant", author=self.bot_name,
+                self.room, f"(Error: {exc})", role="assistant", author=self.bot_name,
                 skills=["error"],
             )
             return
         if self.stream:
             print(flush=True)
         if not answer.strip():
-            answer = "（空の応答が返りました。もう一度話しかけてみてください）"
+            answer = "(The model returned an empty response. Please try again.)"
         self.client.post(
             self.room, answer, role="assistant", author=self.bot_name,
             skills=skills, model=model, simulated=simulated, usage=usage, tools=tools,
         )
         if thoughts.strip():
-            self.log(f"思考ログ {len(thoughts)} 文字（セッション {session.id} に保存）")
+            self.log(f"Thought log: {len(thoughts)} characters (saved to session {session.id})")
         self.log(
             f"→ {self.bot_name}: {' '.join(answer.split())[:80]}"
             f"  [skills={', '.join(skills) or '-'} tokens={usage.get('totalTokenCount', 0)}"
             f"{' tools=' + ','.join(tools) if tools else ''}]"
         )
 
-    # ---- 停止処理 ----
+    # ---- Shutdown ----
     def _install_signal_handlers(self) -> None:
-        def handler(signum: int, frame: Any) -> None:  # pragma: no cover - シグナル
-            self.log("停止要求を受け取りました…")
+        def handler(signum: int, frame: Any) -> None:  # pragma: no cover - signal handler
+            self.log("Shutdown requested…")
             self._stop.set()
 
         for sig in (signal.SIGINT, signal.SIGTERM):
             try:
                 signal.signal(sig, handler)
-            except (ValueError, OSError):  # メインスレッド以外
+            except (ValueError, OSError):  # not running on the main thread
                 pass
 
     def _wait(self, seconds: float) -> None:
@@ -381,7 +379,7 @@ class RoomBot:
 
 
 # ----------------------------------------------------------------------
-# 便利関数
+# Helpers
 # ----------------------------------------------------------------------
 def run_bot(
     settings: Settings,
@@ -418,7 +416,7 @@ def run_bot(
 
 
 def summarize_room(store: RoomStore, name: str) -> list[str]:
-    """ルームの中身を表示用（CLI の rooms コマンド）に整形する。"""
+    """Format room contents for display in the CLI rooms command."""
     room = store.get(name)
     if room is None:
         return []

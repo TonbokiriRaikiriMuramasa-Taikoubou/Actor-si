@@ -44,7 +44,7 @@ class ToolResult:
 
     @property
     def text(self) -> str:
-        return self.content if self.ok else f"エラー: {self.error}"
+        return self.content if self.ok else f"Error: {self.error}"
 
 
 @dataclass
@@ -63,7 +63,7 @@ class Tool:
         try:
             return self.func(**args)
         except TypeError as exc:
-            return ToolResult(False, error=f"引数が不正です: {exc}")
+            return ToolResult(False, error=f"Invalid arguments: {exc}")
         except Exception as exc:  # ツール内の失敗で会話を止めない
             return ToolResult(False, error=f"{type(exc).__name__}: {exc}")
 
@@ -79,7 +79,7 @@ def _safe_path(root: Path, raw: str) -> Path:
     resolved = candidate.resolve()
     root_resolved = root.resolve()
     if resolved != root_resolved and root_resolved not in resolved.parents:
-        raise PermissionError(f"許可された領域の外です: {raw}（root={root_resolved}）")
+        raise PermissionError(f"Path is outside the allowed root: {raw} (root={root_resolved})")
     return resolved
 
 
@@ -87,7 +87,7 @@ def tool_now(timezone_name: str = "Asia/Tokyo") -> ToolResult:
     now = datetime.now(JST if timezone_name.endswith("Tokyo") else timezone.utc)
     return ToolResult(True, content=(
         f"{now.isoformat(timespec='seconds')} ({timezone_name})\n"
-        f"曜日: {now.strftime('%A')}"
+        f"Day: {now.strftime('%A')}"
     ))
 
 
@@ -95,13 +95,13 @@ def tool_read_file(root: Path) -> Callable[..., ToolResult]:
     def run(path: str, max_bytes: int = MAX_READ_BYTES) -> ToolResult:
         target = _safe_path(root, path)
         if not target.is_file():
-            return ToolResult(False, error=f"ファイルがありません: {path}")
+            return ToolResult(False, error=f"File not found: {path}")
         size = target.stat().st_size
         limit = min(int(max_bytes or MAX_READ_BYTES), MAX_READ_BYTES)
         if size > limit:
             with target.open("r", encoding="utf-8", errors="replace") as handle:
                 body = handle.read(limit)
-            return ToolResult(True, content=f"[先頭 {limit} / {size} バイトのみ]\n{body}")
+            return ToolResult(True, content=f"[Showing first {limit} of {size} bytes]\n{body}")
         try:
             return ToolResult(True, content=target.read_text(encoding="utf-8", errors="replace"))
         except OSError as exc:
@@ -114,12 +114,12 @@ def tool_list_files(root: Path) -> Callable[..., ToolResult]:
     def run(path: str = ".", pattern: str = "*", recursive: bool = False) -> ToolResult:
         base = _safe_path(root, path)
         if not base.exists():
-            return ToolResult(False, error=f"場所がありません: {path}")
+            return ToolResult(False, error=f"Path not found: {path}")
         iterator = base.rglob(pattern) if recursive else base.glob(pattern)
         lines: list[str] = []
         for item in iterator:
             if len(lines) >= MAX_LIST_ENTRIES:
-                lines.append("…（以降省略）")
+                lines.append("… (additional entries omitted)")
                 break
             rel = item.relative_to(root) if root in item.resolve().parents or item.resolve() == root else item
             suffix = "/" if item.is_dir() else ""
@@ -128,7 +128,7 @@ def tool_list_files(root: Path) -> Callable[..., ToolResult]:
             except OSError:
                 size = ""
             lines.append(f"{rel}{suffix}{size}")
-        body = "\n".join(lines) or "（該当なし）"
+        body = "\n".join(lines) or "(No matching items)"
         return ToolResult(True, content=f"root: {root}\n{body}")
 
     return run
@@ -137,14 +137,14 @@ def tool_list_files(root: Path) -> Callable[..., ToolResult]:
 def tool_write_file(root: Path) -> Callable[..., ToolResult]:
     def run(path: str, content: str) -> ToolResult:
         if len(content.encode("utf-8")) > MAX_WRITE_BYTES:
-            return ToolResult(False, error=f"書き込みが大きすぎます（上限 {MAX_WRITE_BYTES} バイト）")
+            return ToolResult(False, error=f"File is too large to write (limit: {MAX_WRITE_BYTES} bytes).")
         target = _safe_path(root, path)
         target.parent.mkdir(parents=True, exist_ok=True)
         existed = target.exists()
         target.write_text(content, encoding="utf-8")
         return ToolResult(True, content=(
-            f"{'上書き' if existed else '作成'}しました: {target}"
-            f"（{len(content.encode('utf-8')):,} バイト）"
+            f"{'Overwrote' if existed else 'Created'}: {target}"
+            f" ({len(content.encode('utf-8')):,} bytes)"
         ))
 
     return run
@@ -153,7 +153,7 @@ def tool_write_file(root: Path) -> Callable[..., ToolResult]:
 def tool_http_get(timeout: float = 15.0) -> Callable[..., ToolResult]:
     def run(url: str, max_bytes: int = 100_000) -> ToolResult:
         if not re.match(r"^https?://", url or ""):
-            return ToolResult(False, error="http(s) の URL だけ取得できます")
+            return ToolResult(False, error="Only http(s) URLs are supported.")
         request = urllib.request.Request(url, headers={"User-Agent": "Actor/0.1"})
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
@@ -175,7 +175,7 @@ def tool_list_skills(get_skills: Callable[[], Sequence[Any]]) -> Callable[..., T
             needle = query.lower()
             skills = [s for s in skills if needle in s.name.lower() or needle in (s.description or "").lower()]
         if not skills:
-            return ToolResult(True, content="（該当するスキルはありません）")
+            return ToolResult(True, content="(No matching skills.)")
         lines = [f"- {s.name}: {s.description}" for s in skills[:30]]
         return ToolResult(True, content="\n".join(lines))
 
@@ -191,7 +191,7 @@ def tool_read_skill(get_skills: Callable[[], Sequence[Any]], inline_limit: int =
             if skill.name == target:
                 block = skill.instruction_block(inline_limit=inline_limit)
                 return ToolResult(True, content=block)
-        return ToolResult(False, error=f"スキル '{name}' が見つかりません")
+        return ToolResult(False, error=f"Skill '{name}' not found.")
 
     return run
 
@@ -201,70 +201,70 @@ def tool_read_skill(get_skills: Callable[[], Sequence[Any]], inline_limit: int =
 # ----------------------------------------------------------------------
 BUILTIN_TOOLS: dict[str, dict[str, Any]] = {
     "now": {
-        "description": "現在の日時を取得する（今日の日付・曜日・時刻が要るときに使う）",
+        "description": "Get the current date and time when the request needs today, the weekday, or the current time.",
         "parameters": {
             "type": "object",
             "properties": {
-                "timezone_name": {"type": "string", "description": "タイムゾーン（既定 Asia/Tokyo）"},
+                "timezone_name": {"type": "string", "description": "Time zone (default: Asia/Tokyo)"},
             },
         },
     },
     "read_file": {
-        "description": "許可されたフォルダ内のテキストファイルを読む",
+        "description": "Read a text file inside the allowed directory.",
         "parameters": {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "フォルダからの相対パス（例: README.md）"},
-                "max_bytes": {"type": "integer", "description": "読み込む最大バイト数"},
+                "path": {"type": "string", "description": "Path relative to the allowed directory (e.g. README.md)"},
+                "max_bytes": {"type": "integer", "description": "Maximum number of bytes to read"},
             },
             "required": ["path"],
         },
     },
     "list_files": {
-        "description": "許可されたフォルダ内のファイル一覧を取得する",
+        "description": "List files inside the allowed directory.",
         "parameters": {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "基準フォルダ（既定 .）"},
-                "pattern": {"type": "string", "description": "glob パターン（既定 *）"},
-                "recursive": {"type": "boolean", "description": "再帰的に探すか"},
+                "path": {"type": "string", "description": "Base directory (default: .)"},
+                "pattern": {"type": "string", "description": "Glob pattern (default: *)"},
+                "recursive": {"type": "boolean", "description": "Search recursively"},
             },
         },
     },
     "write_file": {
-        "description": "許可されたフォルダ内にテキストファイルを書き込む（上書き可）",
+        "description": "Write a text file inside the allowed directory (overwriting existing files is permitted).",
         "parameters": {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "フォルダからの相対パス"},
-                "content": {"type": "string", "description": "書き込む内容"},
+                "path": {"type": "string", "description": "Path relative to the allowed directory"},
+                "content": {"type": "string", "description": "Content to write"},
             },
             "required": ["path", "content"],
         },
     },
     "http_get": {
-        "description": "URL の内容を取得する（テキストのみ）",
+        "description": "Fetch text content from a URL.",
         "parameters": {
             "type": "object",
             "properties": {
-                "url": {"type": "string", "description": "http(s) の URL"},
-                "max_bytes": {"type": "integer", "description": "取得する最大バイト数"},
+                "url": {"type": "string", "description": "http(s) URL"},
+                "max_bytes": {"type": "integer", "description": "Maximum number of bytes to fetch"},
             },
             "required": ["url"],
         },
     },
     "list_skills": {
-        "description": "Actor が読み込んでいるスキル（SKILL.md）の一覧を取得する",
+        "description": "List the skills (SKILL.md files) loaded by Actor.",
         "parameters": {
             "type": "object",
-            "properties": {"query": {"type": "string", "description": "絞り込み語（任意）"}},
+            "properties": {"query": {"type": "string", "description": "Optional search query"}},
         },
     },
     "read_skill": {
-        "description": "指定したスキル（SKILL.md）の中身を読む。その手順に従う必要が出たときに使う",
+        "description": "Read a skill (SKILL.md) when you need to follow its instructions.",
         "parameters": {
             "type": "object",
-            "properties": {"name": {"type": "string", "description": "スキル名（例: minutes-writer）"}},
+            "properties": {"name": {"type": "string", "description": "Skill name (e.g. minutes-writer)"}},
             "required": ["name"],
         },
     },
@@ -357,7 +357,7 @@ class ToolRegistry:
     def execute(self, name: str, args: dict[str, Any]) -> ToolResult:
         tool = self._tools.get(name)
         if tool is None:
-            return ToolResult(False, error=f"ツール '{name}' は使えません（有効: {', '.join(self.names()) or 'なし'}）")
+            return ToolResult(False, error=f"Tool '{name}' is not available (enabled: {', '.join(self.names()) or 'none'}).")
         return tool.call(dict(args or {}))
 
     def describe(self) -> list[dict[str, Any]]:

@@ -271,13 +271,13 @@ def load_reference(path: Path, root: Path) -> Reference:
     ref = Reference(path=path, relpath=relpath, size=size, kind=kind, mime_type=mime)
 
     if size > MAX_REFERENCE_BYTES:
-        ref.error = f"大きすぎるため読み込みません ({size} bytes)"
+        ref.error = f"Too large to load ({size} bytes)."
         return ref
     if kind == "text":
         try:
             ref.text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
-            ref.error = "UTF-8 として読めません（バイナリ扱い）"
+            ref.error = "could not be read as UTF-8 (treated as binary)"
             ref.kind = "binary"
         except OSError as exc:
             ref.error = str(exc)
@@ -433,16 +433,16 @@ class Skill:
         """1つのスキルを、system_instruction に埋め込むテキストへ変換する。"""
         parts = [f"<skill name=\"{self.name}\">"]
         if self.description:
-            parts.append(f"概要: {self.description}")
+            parts.append(f"Description: {self.description}")
         parts.append("")
         parts.append(self.instructions.strip())
 
         inlined, omitted = self._inline_text_references(inline_limit)
         if inlined:
             parts.append("")
-            parts.append("## 参照資料（スキルに同梱）")
+            parts.append("## Reference materials (included with this skill)")
             for relpath, text in inlined:
-                parts.append(f"### 参照: {relpath}")
+                parts.append(f"### Reference: {relpath}")
                 fence = code_fence(text)
                 parts.append(fence)
                 parts.append(text.strip())
@@ -450,8 +450,8 @@ class Skill:
         if omitted:
             parts.append("")
             parts.append(
-                "補足: 次の参照資料はサイズが大きいため system_instruction には含めていません。"
-                f"必要になったら内容をユーザーに確認してください: {', '.join(omitted)}"
+                "Note: The following reference files are too large to include in the system instruction. "
+                f"Ask the user for their contents if needed: {', '.join(omitted)}"
             )
         parts.append("</skill>")
         return "\n".join(parts)
@@ -525,27 +525,27 @@ def _build_skill(skill_md: Path, root: Path, source: str = "") -> Skill:
         raise
     except UnicodeDecodeError:
         raw = skill_md.read_text(encoding="utf-8", errors="replace")
-        warnings.append("SKILL.md は UTF-8 として厳密には読めませんでした（置換しました）")
+        warnings.append("SKILL.md could not be decoded as strict UTF-8; invalid bytes were replaced.")
 
     meta, body = parse_frontmatter(raw)
     folder_name = root.name if root.name else skill_md.stem
     name = str(meta.get("name") or "").strip()
     if not name:
         name = slugify(folder_name)
-        warnings.append(f"frontmatter に name が無いためフォルダ名から '{name}' を推定しました")
+        warnings.append(f"No frontmatter name found; using folder name '{name}'.")
     normalized = slugify(name)
     if name != normalized:
-        warnings.append(f"name '{name}' は kebab-case ではないため '{normalized}' として扱います")
+        warnings.append(f"Skill name '{name}' is not kebab-case; using '{normalized}'.")
         name = normalized
 
     description = str(meta.get("description") or meta.get("summary") or "").strip()
     if not description:
-        description = _first_line(body) or f"{name} のスキル"
-        warnings.append("frontmatter に description が無いため本文から推定しました")
+        description = _first_line(body) or f"{name} skill"
+        warnings.append("No frontmatter description found; inferred one from the body.")
 
     instructions = body.strip()
     if not instructions:
-        warnings.append("SKILL.md の本文が空です")
+        warnings.append("SKILL.md body is empty.")
 
     references: list[Reference] = []
     if root.is_dir():
@@ -632,7 +632,7 @@ class SkillLibrary:
                 if skill.name in skills:
                     errors.append({
                         "path": str(skill.path),
-                        "error": f"スキル名 '{skill.name}' が重複しています（先に見つかったものを採用）",
+                        "error": f"Duplicate skill name '{skill.name}'; using the first one found.",
                     })
                     continue
                 skills[skill.name] = skill
@@ -766,7 +766,7 @@ class SkillLibrary:
     # ---- 生成 / 更新 ----
     def primary_dir(self) -> Path:
         if not self.dirs:
-            raise RuntimeError("skills ディレクトリが設定されていません")
+            raise RuntimeError("No skills directory is configured.")
         return self.dirs[0]
 
     def create(self, name: str, description: str, instructions: str,
@@ -774,12 +774,12 @@ class SkillLibrary:
                directory: Path | None = None) -> Skill:
         slug = slugify(name)
         if not NAME_RE.match(slug):
-            raise ValueError(f"スキル名 '{name}' を kebab-case に正規化できませんでした")
+            raise ValueError(f"Could not normalize skill name '{name}' to kebab-case.")
         base = Path(directory) if directory else self.primary_dir()
         target_dir = base / slug
         skill_md = target_dir / SKILL_FILENAME
         if skill_md.exists() and not overwrite:
-            raise FileExistsError(f"スキル '{slug}' は既に存在します: {skill_md}")
+            raise FileExistsError(f"Skill '{slug}' already exists: {skill_md}")
         target_dir.mkdir(parents=True, exist_ok=True)
         merged: dict[str, Any] = {"name": slug}
         if description:
@@ -792,7 +792,7 @@ class SkillLibrary:
         self.reload(force=True)
         skill = self.get(slug)
         if skill is None:  # pragma: no cover
-            raise RuntimeError("作成したスキルを読み込めませんでした")
+            raise RuntimeError("Could not load the created skill.")
         return skill
 
     def update(self, name: str, description: str | None = None, instructions: str | None = None,
@@ -800,7 +800,7 @@ class SkillLibrary:
         slug = slugify(name)
         skill = self.get(slug)
         if skill is None:
-            raise KeyError(f"スキル '{slug}' が見つかりません")
+            raise KeyError(f"Skill '{slug}' not found.")
         merged = dict(skill.meta)
         merged["name"] = slug
         if description is not None:
@@ -825,7 +825,7 @@ class SkillLibrary:
             return False
         managed = any(_is_relative_to(skill.root, d) for d in self.dirs)
         if not managed:
-            raise PermissionError(f"'{slug}' は管理下のディレクトリ外のため削除できません")
+            raise PermissionError(f"Cannot delete '{slug}' because it is outside the managed skill directories.")
         import shutil
 
         if skill.root.is_dir():
@@ -840,7 +840,7 @@ class SkillLibrary:
         """Gemini へアップロードできる ZIP（最上位に SKILL.md）を作る。"""
         targets = self.resolve(names)[0] if names else self.all()
         if not targets:
-            raise KeyError("対象のスキルがありません")
+            raise KeyError("No skills selected.")
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
             for skill in targets:
