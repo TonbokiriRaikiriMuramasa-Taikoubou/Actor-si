@@ -1,6 +1,6 @@
 # Actor
 
-[![Tests](https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor/actions/workflows/tests.yml/badge.svg)](https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor/actions/workflows/tests.yml)
+[![Tests](https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si/actions/workflows/tests.yml/badge.svg)](https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si/actions/workflows/tests.yml)
 
 **Actor is a local-first Gemini client that loads `SKILL.md` folders as system instructions.** It includes a command-line interface, HTTP API, and web UI, and runs on Python's standard library without mandatory dependencies. Skills can be selected automatically, composed with references, and tested before use. The server binds to loopback by default; external binding requires an API token, and browser access is disabled unless explicitly allowed by a CORS origin list.
 
@@ -35,8 +35,8 @@ Actor はその形式のフォルダをそのまま読み込み、
 ## 30秒で試す
 
 ```bash
-git clone https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor.git
-cd Actor
+git clone https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si.git
+cd Actor-si
 
 # 依存インストール不要（Python 3.9+ があれば動きます）
 python3 -m actor "会議の文字起こしから議事録を作って"
@@ -268,7 +268,7 @@ python3 -m actor serve --port 8080
 curl -s -X POST localhost:8080/api/rooms/actor-x/messages \
   -H 'X-Actor-Token: hireme-please-change' \
   -H 'Content-Type: application/json' -d '{"text":"おはよー"}'
-# Authorization: Bearer <token> ・ ?token=<token> でも可（401/403 の代わりに 403 を返します）
+# Authorization: Bearer <token> も可。URLクエリにはトークンを付けないでください。
 ```
 
 - トークン未指定または不正なリクエストは **403**。Web UI は起動時にサーバーがトークンを要求した場合、入力を促します。API クライアントでは `X-Actor-Token` または `Authorization: Bearer` ヘッダーを設定してください。

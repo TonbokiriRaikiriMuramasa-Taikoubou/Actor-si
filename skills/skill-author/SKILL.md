@@ -49,7 +49,30 @@ Agent Skills の標準的な SKILL.md 形式を満たすファイルとして書
 
 ## SKILL.md
 ```markdown
-<frontmatter を含む完全な SKILL.md>
+---
+name: example-skill
+description: Creates an example result. Use when the user requests this reusable task.
+license: MIT
+metadata:
+  version: "1.0.0"
+  tags:
+    - example
+---
+
+# 目的
+（達成する目的）
+
+# 入力
+（必要な入力）
+
+# 手順
+1. 入力を確認する。
+
+# 出力フォーマット
+結果を見出しと項目で示す。
+
+# 確認事項
+共通原則は `references/principles.md` を適用する。
 ```
 ````
 

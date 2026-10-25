@@ -20,10 +20,11 @@ dev = []
 actor = "actor.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor"
+Homepage = "https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si"
+Repository = "https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si"
 
 [tool.setuptools]
 packages = ["actor"]
 
 [tool.setuptools.package-data]
-actor = ["web/*"]
+actor = ["web/*", "resources/*"]

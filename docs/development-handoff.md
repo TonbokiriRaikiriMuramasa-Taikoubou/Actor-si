@@ -55,8 +55,8 @@ README より少し踏み込んで書いています（コマンドはそのま�
 ## 3. クイックスタート（手元のマシンで）
 
 ```bash
-git clone https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor.git
-cd Actor
+git clone https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si.git
+cd Actor-si
 
 # 1) API キーを入れる（3つのどれでも。優先度: --api-key > 環境変数 > .env > .actor/api_key）
 cp .env.example .env && vi .env          # GEMINI_API_KEY=AIza...

@@ -114,8 +114,8 @@ class ActorHandler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         if urllib.parse.urlparse(self.path).path.startswith("/api/"):
             self._cors()
-        # プレビュー（iframe 埋め込み）でも動くようにフレーム制限を掛けない
-        self.send_header("Content-Security-Policy", "frame-ancestors *")
+        # 外部サイトからのクリックジャッキング埋め込みを防止する
+        self.send_header("Content-Security-Policy", "frame-ancestors 'self'")
         for key, value in (extra or {}).items():
             self.send_header(key, value)
         self.end_headers()
@@ -151,6 +151,9 @@ class ActorHandler(BaseHTTPRequestHandler):
         if not self._valid_host():
             self._error(400, "不正な Host ヘッダーです")
             return
+        if not self._origin_allowed():
+            self._error(403, "許可されていない Origin です")
+            return
         self.send_response(HTTPStatus.NO_CONTENT)
         self._cors()
         self.send_header("Allow", "GET, POST, PUT, DELETE, OPTIONS")
@@ -174,7 +177,7 @@ class ActorHandler(BaseHTTPRequestHandler):
 
     # ---- ルームのトークン認証 ----
     def _token_from_request(self) -> str:
-        """``X-Actor-Token`` / ``Authorization: Bearer`` / ``?token=`` の順に探す。"""
+        """``X-Actor-Token`` / ``X-Room-Token`` / ``Authorization: Bearer`` ヘッダーを探す。"""
         for header in ("X-Actor-Token", "X-Room-Token"):
             value = (self.headers.get(header) or "").strip()
             if value:
@@ -182,8 +185,6 @@ class ActorHandler(BaseHTTPRequestHandler):
         auth = (self.headers.get("Authorization") or "").strip()
         if auth.lower().startswith("bearer "):
             return auth[7:].strip()
-        query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-        return (query.get("token") or [""])[0].strip()
 
     def _token_ok(self) -> bool:
         expected = self.settings.room_token
@@ -195,8 +196,7 @@ class ActorHandler(BaseHTTPRequestHandler):
     def _require_token(self) -> None:
         if not self._token_ok():
             raise PermissionError(
-                "ルームのトークンが必要です"
-                "（X-Actor-Token ヘッダ / Authorization: Bearer / ?token= のいずれか）"
+                "API トークンが必要です（X-Actor-Token または Authorization: Bearer ヘッダー）"
             )
 
     def _cors(self) -> None:
@@ -231,6 +231,29 @@ class ActorHandler(BaseHTTPRequestHandler):
         except ValueError:
             return hostname in allowed
 
+    def _origin_allowed(self) -> bool:
+        """Allow requests without Origin (non-browser clients), same-origin requests, or allowlisted origins."""
+        origin = (self.headers.get("Origin") or "").strip()
+        if not origin:
+            return True
+        if origin in set(self.settings.cors_origins):
+            return True
+        try:
+            parsed = urllib.parse.urlsplit(origin)
+            if not parsed.hostname or parsed.path or parsed.query or parsed.fragment:
+                return False
+            forwarded_proto = (self.headers.get("X-Forwarded-Proto") or "http").split(",", 1)[0].strip().lower()
+            if forwarded_proto not in {"http", "https"} or parsed.scheme.lower() != forwarded_proto:
+                return False
+            host_header = urllib.parse.urlsplit("//" + (self.headers.get("Host") or ""))
+            request_host = host_header.hostname
+            default_port = 443 if forwarded_proto == "https" else 80
+            origin_port = parsed.port if parsed.port is not None else default_port
+            request_port = host_header.port if host_header.port is not None else default_port
+            return bool(request_host and parsed.hostname.lower() == request_host.lower() and origin_port == request_port)
+        except ValueError:
+            return False
+
     def _route(self, method: str) -> None:
         if not self._valid_host():
             self._error(400, "不正な Host ヘッダーです")
@@ -240,6 +263,13 @@ class ActorHandler(BaseHTTPRequestHandler):
         query = urllib.parse.parse_qs(parsed.query)
         try:
             if path.startswith("/api/"):
+                if method in {"POST", "PUT", "DELETE"}:
+                    if not self._origin_allowed():
+                        raise PermissionError("許可されていない Origin です")
+                    content_type = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+                    if content_type != "application/json":
+                        self._error(415, "変更系 API は Content-Type: application/json が必要です")
+                        return
                 # CORS preflight は認証ヘッダーを送れないため除外。実リクエストは全APIを保護。
                 if method != "OPTIONS" and self.settings.room_token:
                     self._require_token()
@@ -767,7 +797,7 @@ class ActorHandler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-cache, no-transform")
         self.send_header("X-Accel-Buffering", "no")
         self.send_header("Connection", "close")
-        self.send_header("Content-Security-Policy", "frame-ancestors *")
+        self.send_header("Content-Security-Policy", "frame-ancestors 'self'")
         self._cors()
         self.end_headers()
         self.close_connection = True
