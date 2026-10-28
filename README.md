@@ -55,6 +55,30 @@ The ZIP includes the canonical MIT `LICENSE` and shared principles. Review the c
 - **`minutes-writer`** — Turns transcripts or notes into structured minutes with decisions, actions, owners, deadlines, and open questions. A separate Japanese edition is available in `i18n/ja/skills`; use it for meeting records, not a generic summary.
 - **`brand-voice`** — Polishes user-provided copy in a calm, consistent voice while preserving facts and meaning. Use it to revise existing copy, not to fact-check or create unsupported facts.
 
+### Install the skills in your coding agent
+
+The five skills also work outside Actor. Install them with the open-source [`skills` CLI](https://github.com/vercel-labs/skills) (Node.js required), which installs each skill folder into Claude Code, Cursor, Codex, and other supported agents:
+
+```bash
+# See what this repository provides
+npx skills add TonbokiriRaikiriMuramasa-Taikoubou/Actor-si --list
+
+# Install into the current project (prompts for skills and agents)
+npx skills add TonbokiriRaikiriMuramasa-Taikoubou/Actor-si
+```
+
+Useful options:
+
+| Goal | Command |
+|---|---|
+| Install one skill | `npx skills add TonbokiriRaikiriMuramasa-Taikoubou/Actor-si --skill minutes-writer` |
+| Install for your user instead of this project | add `-g` |
+| Choose the agent | add `-a claude-code` (or `-a cursor`, `-a codex`; `'*'` for all) |
+| Install everything without prompts | add `--all` |
+| Copy files instead of symlinking | add `--copy` |
+
+Each installed skill is self-contained: it includes its own `references/` (with the shared `principles.md`) and the MIT `LICENSE`. Unless disabled, the CLI sends anonymous install telemetry to [skills.sh](https://skills.sh), including skill names, skill files, and timestamps. Repository and skill names are also sent when GitHub verifies the repository is public. The telemetry does not include personal or device information. Set `DISABLE_TELEMETRY=1` to opt out. The example persona in `examples/mika` is marked internal and is not installed.
+
 ### What it is not
 
 Actor-si is not a hosted service, and these bundled skills do not directly act on external systems or submit content. They produce or guide text based on material you provide. Actor-si's optional network tool is disabled by default and must be explicitly enabled. If you need a skill that operates an external service, this bundle does not provide that integration.

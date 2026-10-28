@@ -1,6 +1,6 @@
 # Actor-si maintainer handoff
 
-Last reviewed: 2026-10-26
+Last reviewed: 2026-10-29
 
 Repository: <https://github.com/TonbokiriRaikiriMuramasa-Taikoubou/Actor-si>
 
@@ -79,6 +79,15 @@ The default skill tests are format-only: they inspect output templates and asser
 - Lint is a conservative approximation, not a safety guarantee or marketplace approval. Review the complete ZIP and warnings manually. Japanese privacy advice should not trigger concealment findings; explicit concealment from the user and concealment paired with sending, uploading, or execution should remain detectable.
 - Binary references, hidden files, caches, tests, and dependencies are excluded. A root source `LICENSE` is replaced by the canonical bundled MIT license, so it is not an omitted-reference warning. Actor does not submit skills or operate external accounts.
 - English bundled skill descriptions state both `Use when` and `Do not use when`; keep that boundary in the description of new English skills. Japanese skill files are maintained separately.
+
+## skills.sh installation
+
+- The English README documents installation of the five bundled English skills through Vercel's `skills` CLI (`npx skills add <owner/repo>`). The Japanese README explicitly says that this route installs the English edition only.
+- The CLI discovers directories containing `SKILL.md` and installs files from each skill folder. Keep `references/principles.md` and `LICENSE` vendored in every public skill; `_house/` is the Actor-si source of truth, and `tests/test_skills_sh_layout.py` checks that the copies remain byte-identical. Do not remove those copies without confirming the host's install behavior and updating the layout test.
+- `examples/mika/SKILL.md` has `metadata.internal: true` so full-depth skills CLI discovery excludes the local bot persona. Keep it available to Actor-si's local bot workflow; do not treat it as one of the five public bundled skills.
+- Japanese skills under `i18n/ja/skills` remain opt-in for Actor-si and are not documented for skills CLI installation. If that changes, vendor and test each Japanese `principles.md` and `LICENSE`, and document the locale-specific repository subpath.
+- The skills CLI transmits anonymous install telemetry unless opted out. Use `DISABLE_TELEMETRY=1` for all automated/local discovery and installation checks; never make a telemetry-enabled install on behalf of a maintainer. README privacy language should describe the reported data fields and opt-out accurately.
+- Optional smoke check (requires Node/npm; no telemetry): `DISABLE_TELEMETRY=1 npx skills add . --list --full-depth`. Expect exactly the five public skills. For a real install smoke test, use a temporary directory, `--copy`, and a specific agent, then verify `SKILL.md`, `references/principles.md`, and `LICENSE`; avoid writing to a maintainer's home directory.
 
 ## Release and change constraints
 
