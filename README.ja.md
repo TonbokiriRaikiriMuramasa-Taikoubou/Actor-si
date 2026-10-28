@@ -61,6 +61,30 @@ python3 -m actor skills export minutes-writer --target agensi -o minutes-writer.
 - **`minutes-writer`** — 文字起こしやメモから決定事項、アクション、担当、期限、未解決点を含む議事録を作ります。日本語版は `i18n/ja/skills` にあります。会議記録用であり、一般的な要約向けではありません。
 - **`brand-voice`** — ユーザーが提供した文章を、事実と意味を保ちながら落ち着いた一貫性のある文体に整えます。既存文章の推敲向けで、事実確認や根拠のない新規事実の作成には使いません。
 
+### コーディングエージェントに導入する
+
+5つのスキルは Actor の外でも使えます。オープンソースの [`skills` CLI](https://github.com/vercel-labs/skills)（Node.js が必要）で、Claude Code、Cursor、Codex など対応エージェントにスキルのフォルダーを導入できます。導入されるのは英語版です。
+
+```bash
+# このリポジトリに含まれるスキルを確認する
+npx skills add TonbokiriRaikiriMuramasa-Taikoubou/Actor-si --list
+
+# 現在のプロジェクトに導入する（スキルとエージェントを対話で選択）
+npx skills add TonbokiriRaikiriMuramasa-Taikoubou/Actor-si
+```
+
+主なオプション:
+
+| 目的 | コマンド |
+|---|---|
+| 1つだけ導入する | `npx skills add TonbokiriRaikiriMuramasa-Taikoubou/Actor-si --skill minutes-writer` |
+| プロジェクトではなくユーザー全体に導入する | `-g` を付ける |
+| エージェントを指定する | `-a claude-code`（`-a cursor`、`-a codex` など。全部なら `'*'`） |
+| 確認なしで全部導入する | `--all` を付ける |
+| シンボリックリンクではなくコピーする | `--copy` を付ける |
+
+導入された各スキルには、共通原則 `principles.md` を含む `references/` と MIT `LICENSE` が入っており、単体で動きます。無効化しない限り、CLI はスキル名・スキルのファイル・タイムスタンプを含む匿名テレメトリを [skills.sh](https://skills.sh) に送信します。GitHub で公開と確認された場合は、リポジトリ名とスキル名も送信されます。個人情報や端末情報は含まれません。停止するには `DISABLE_TELEMETRY=1` を設定してください。`examples/mika` のペルソナは internal 指定のため導入されません。
+
 ### 提供しないもの
 
 Actor-si はホスト型サービスではありません。同梱スキル自体が外部システムを操作したり、コンテンツを提出したりすることもありません。ユーザーが提供した材料をもとにテキストを作成・支援します。Actor-si の任意ネットワークツールは既定で無効で、使う場合も明示的な有効化が必要です。外部サービスを直接操作するスキルは同梱していません。

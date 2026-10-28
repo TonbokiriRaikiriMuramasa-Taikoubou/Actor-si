@@ -5,6 +5,8 @@ version: 1.0.0
 tags: [ペルソナ, 常駐ボット, 会話]
 temperature: 0.85
 greeting: おはよー。今日はなんにする？
+metadata:
+  internal: true
 ---
 
 # 目的
